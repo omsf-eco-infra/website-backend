@@ -1,0 +1,29 @@
+[project]
+authors = [{name = "David W.H. Swenson", email = "dwhs@hyperblazer.net"}]
+name = "website-backend"
+requires-python = ">= 3.11"
+version = "0.1.0"
+dependencies = [
+    "pydantic>=2,<3",
+    "boto3",
+]
+
+[project.optional-dependencies]
+dev = ["pre-commit", "pytest", "pytest-cov", "ruff"]
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-64"]
+
+[tool.pixi.pypi-dependencies]
+website_backend = { path = ".", editable = true }
+
+[tool.pixi.environments]
+default = { features = [], solve-group = "default" }
+dev = { features = ["dev"], solve-group = "default" }
+
+[tool.pixi.tasks]
