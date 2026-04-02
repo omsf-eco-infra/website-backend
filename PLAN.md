@@ -1,0 +1,413 @@
+# Reusable Workflow Architecture Plan
+
+This is a living implementation plan for the reusable AWS workflow platform described in pages 1-6 of [May 2026 Demo_ Architecture Plan-2.pdf](/Users/dwhs/Dropbox/omsf/eco-infra/src/website-backend/May%202026%20Demo_%20Architecture%20Plan-2.pdf). It intentionally excludes all OpenFold/OpenFE-specific workflow logic. The goal is to turn the non-specific platform architecture into reusable building blocks that can support multiple future workflows.
+
+## Summary
+
+This plan breaks the work into PR-sized phases. Each phase is meant to be independently reviewable, with a clear definition of done and explicit test expectations. The reusable platform has four main concerns:
+
+- strict message contracts between website, orchestration, and compute
+- a generic Exorcist-backed orchestration engine
+- Terraform modules that deploy reusable AWS infrastructure
+- test harnesses that prove deployed code paths work in a real AWS sandbox account
+
+The implementation sequence below is ordered to minimize rework. Shared contracts and test harnesses come first, then Python runtime components, then Terraform modules that package and exercise those components.
+
+## Phase Template
+
+Every phase in this document should use the same structure:
+
+- `Overview`: conceptual context needed for handoff
+- `Checklist`: concrete implementation tasks
+- `Definition of Done`: what must be true before merging
+- `Tests`: verification required for the phase
+
+## Public Interfaces and Contracts
+
+These contracts should be treated as stable early so later phases do not redefine them.
+
+### Message families
+
+- `InputsMessage`
+- `OutputsMessage`
+- `OrchestrationMessage`
+- `TaskMessage`
+
+### Shared identifiers and primitives
+
+- `workflow_name`: identifies the deployed workflow variant; used for validation and routing at the web edge
+- `version`: version of the message contract
+- `run_id`: identifies a user-visible run
+- `graph_id`: identifies the orchestration graph managed by Exorcist
+- `task_id`: identifies a task within a graph
+- `task_type`: dispatch key for worker routing
+- URL maps: string-to-URL mappings used for output discovery and worker input/output locations
+- opaque `details` objects: workflow-specific payloads that stay untyped at the reusable platform layer
+
+### Reusable orchestrator boundary
+
+The reusable orchestration layer should expose clear boundaries for:
+
+- task graph persistence
+- task state transitions
+- runnable-task selection
+- task dispatch onto the shared task SNS topic
+- retry/error handling policy
+
+The orchestrator should remain generic. Workflow-specific rules belong upstream in graph construction, not in orchestration execution.
+
+### Terraform module interfaces
+
+The Terraform module boundaries should stay aligned with the architecture document:
+
+- `orchestration`: orchestration queue, shared task topic, orchestrator Lambda, state-store inputs, outputs needed by downstream modules
+- `task-queue`: FIFO SQS task queue, DLQ, SNS subscription and filtering, outputs for compute modules
+- `fargate-compute`: launcher Lambda, ECS task definition, task-topic subscription, queue/network/image inputs
+- `web-interface`: Lambda, Function URL, input and output buckets, orchestration queue access, outputs for website integration
+
+## Assumptions and Defaults
+
+- Include an explicit `Phase 0` rather than folding setup work into feature phases.
+- Exclude all OpenFold/OpenFE-specific task types, metadata schemas, and workflow graphs from this plan.
+- Use one shared task SNS topic in v1, with downstream routing handled by queue subscriptions and filtering.
+- Keep `graph_id` distinct from `run_id` in the reusable contract, even if some initial workflows map them 1:1.
+- Use native `terraform test` for Terraform integration tests.
+- Run Terraform integration tests against a real AWS sandbox account, not a local emulator.
+- Python work should use `pytest` through the repo's `pixi` dev environment.
+- Example Lambda and Fargate artifacts exist only to prove module behavior and should stay generic.
+
+## Phase 0: Foundation and Shared Test Harness
+
+### Overview
+
+This phase establishes the shared implementation frame for the rest of the project. The goal is to prevent later PRs from reopening questions about package layout, module boundaries, test execution, or deployment conventions. The output of this phase is not feature behavior; it is a stable baseline that every later phase can depend on.
+
+There are two key ideas here:
+
+- the reusable platform should separate workflow-specific behavior from generic infrastructure and runtime logic
+- integration tests should validate deployed behavior, not just Terraform resource shape
+
+This phase should also define how repo-level tooling supports both Python unit tests and real-AWS Terraform tests, so each later phase can focus on its own behavior instead of recreating harness code.
+
+### Checklist
+
+- [ ] Define the long-term repo layout for reusable Python runtime code, Terraform modules, Terraform test fixtures, and example artifacts.
+- [ ] Define naming conventions for Lambda packages, example worker images, helper scripts, and test assets.
+- [ ] Document shared environment variables and configuration inputs used across Python and Terraform code.
+- [ ] Define how helper scripts are invoked from `terraform test` for packaging Lambdas, invoking Function URLs, publishing messages, polling queues, and asserting side effects.
+- [ ] Define real-AWS sandbox naming, tagging, and teardown rules so test resources are easy to isolate and clean up.
+- [ ] Document how `pixi` environments should be used for Python development and test execution.
+- [ ] Add any repo-level fixtures or helper directories that later phases will reuse.
+- [ ] Add guidance on how future edits should extend this plan without changing the phase template.
+
+### Definition of Done
+
+- Later phases can rely on one documented project layout, one testing approach, and one set of environment/config conventions.
+- There is no ambiguity about where new Python code, Terraform code, Terraform tests, and example runtime artifacts belong.
+- Later PRs can reuse shared helper patterns instead of inventing their own test wiring.
+
+### Tests
+
+- Verify the documented commands for Python tests and Terraform tests are executable in the repo.
+- Verify any shared helper scripts run without workflow-specific assumptions.
+- Verify the repo can support both unit-test-only phases and real-AWS integration-test phases without changing the conventions.
+
+## Phase 1: Python Message Contracts
+
+### Overview
+
+The message layer is the central contract for the whole platform. It defines how the website submits work, how orchestration state changes are recorded, and how compute workers receive task payloads. The reusable platform should enforce strict envelope validation while intentionally leaving workflow-specific payload bodies opaque.
+
+That split matters because the envelopes are infrastructure contracts, while the `details` payloads are application contracts. If the reusable layer tries to encode workflow-specific schemas, it stops being reusable.
+
+### Checklist
+
+- [ ] Expand the existing Pydantic models to cover `InputsMessage` and `OutputsMessage` in addition to the current orchestration and task messages.
+- [ ] Centralize shared constrained types, strict base-model behavior, and reusable serialization helpers.
+- [ ] Preserve discriminated orchestration parsing for `ADD_TASKS`, `TASK_COMPLETED`, and `TASK_ERROR`.
+- [ ] Standardize field naming and version handling across all message families.
+- [ ] Add helper functions for validation and round-trip serialization that Lambda handlers and tests can reuse.
+- [ ] Keep workflow-specific `details` values opaque and do not introduce OpenFold/OpenFE-specific nested models.
+- [ ] Document the intended ownership of each message family so later phases use them consistently.
+
+### Definition of Done
+
+- A single reusable Python package defines all cross-component message contracts.
+- All message families reject unknown top-level fields and enforce the required core identifiers.
+- Runtime code and tests can use shared helpers instead of reimplementing parsing logic.
+
+### Tests
+
+- `pytest` tests for successful parsing of all message families.
+- `pytest` tests for missing required fields, extra-field rejection, and invalid discriminators.
+- `pytest` tests for nested opaque `details` values and round-trip serialization.
+- `pytest` tests for any shared helper functions used by handlers.
+
+## Phase 2: Python Exorcist Orchestrator Lambda
+
+### Overview
+
+The orchestrator is the reusable task-graph engine. It receives orchestration messages, updates the graph state, persists that state, and emits runnable tasks. Its job is execution control, not workflow design.
+
+Conceptually, the orchestrator has three responsibilities:
+
+- translate incoming orchestration messages into graph-state mutations
+- persist the authoritative graph state after each mutation
+- publish newly runnable tasks to the shared task topic
+
+To stay reusable, the Lambda should depend on clear adapters for persistence, Exorcist interaction, and task dispatch. That makes the orchestration logic testable without real AWS and keeps infrastructure concerns separate from state-transition logic.
+
+### Checklist
+
+- [ ] Define adapter boundaries for graph persistence, task dispatch, and Exorcist-backed state operations.
+- [ ] Implement the Lambda handler entrypoint and event decoding for orchestration queue messages.
+- [ ] Implement `ADD_TASKS` handling that inserts tasks and immediately dispatches newly runnable work.
+- [ ] Implement `TASK_COMPLETED` handling that marks completion, persists state, and dispatches newly unblocked tasks.
+- [ ] Implement `TASK_ERROR` handling that applies retry/error policy and dispatches follow-on work when appropriate.
+- [ ] Persist graph state to S3 after each accepted mutation.
+- [ ] Define explicit behavior for duplicate completions, duplicate errors, unknown tasks, and no-op events.
+- [ ] Ensure emitted `TaskMessage` payloads come from the shared Phase 1 message contracts.
+- [ ] Keep task-type routing generic and driven by message content plus dispatch configuration.
+
+### Definition of Done
+
+- The orchestrator handler deterministically processes supported message types and persists authoritative state after each accepted mutation.
+- Runnable tasks are emitted as valid `TaskMessage` payloads using the shared contract package.
+- Edge-case behavior is defined for duplicate, stale, or invalid graph events.
+
+### Tests
+
+- `pytest` tests for `ADD_TASKS`, `TASK_COMPLETED`, and `TASK_ERROR` flows.
+- `pytest` tests for dependency unlocking and dispatch of newly runnable tasks.
+- `pytest` tests for duplicate completion/error events and other idempotency scenarios.
+- `pytest` tests for retry behavior, terminal error behavior, and no-runnable-task cases.
+- `pytest` tests that persistence and dispatch adapters are called with the expected payloads.
+
+## Phase 3: Terraform Orchestration Module
+
+### Overview
+
+This module packages the reusable orchestration core for deployment. Its value is not just that it creates AWS resources, but that it deploys executable orchestrator code and proves that the deployed code can process real messages in AWS.
+
+This is the first Terraform phase that must treat code packaging and deployed behavior as part of the module contract. The module should not stop at queues, topics, and IAM. It also needs to make the Phase 2 Lambda artifact deployable and testable.
+
+### Checklist
+
+- [ ] Create the `orchestration` Terraform module structure.
+- [ ] Define inputs for the orchestration queue, shared task topic behavior, Lambda packaging, state-store bucket/key configuration, and tagging.
+- [ ] Provision the orchestration SQS queue, orchestrator Lambda, IAM permissions, log group, and SNS topic integration required by the architecture.
+- [ ] Wire the module to deploy the Phase 2 Lambda artifact.
+- [ ] Expose outputs required by downstream `task-queue` and `web-interface` modules.
+- [ ] Define how the module receives artifact paths or package references during tests and deployments.
+- [ ] Add native `terraform test` coverage that publishes a sample orchestration message into AWS.
+- [ ] Assert that the deployed Lambda runs, publishes task output onto the shared task topic, and persists graph state to the configured store.
+
+### Definition of Done
+
+- The module can be instantiated on its own in the sandbox account.
+- A real orchestration message sent to the deployed resources produces observable orchestration side effects.
+- The module outputs are sufficient for downstream modules without leaking implementation details.
+
+### Tests
+
+- `terraform test` that provisions the module and publishes a sample `ADD_TASKS` message.
+- Assertions that the task topic receives the expected downstream payload.
+- Assertions that graph state is persisted to the configured S3 location.
+- Assertions that required outputs are populated and usable by other modules.
+
+## Phase 4: Terraform Task Queue Module
+
+### Overview
+
+This module provides a reusable worker lane. It owns SQS delivery semantics, retry boundaries, and routing from the shared task topic into a task-specific queue. This keeps worker implementations decoupled from the shared task publication mechanism.
+
+The main architectural point is that the shared task SNS topic can serve many task queues, but each queue should receive only the task types it is responsible for. Filtering and subscription semantics are therefore part of the reusable module contract.
+
+### Checklist
+
+- [ ] Create the `task-queue` Terraform module structure.
+- [ ] Provision one FIFO SQS queue plus one DLQ with redrive settings.
+- [ ] Add queue policy and subscription wiring from the shared task SNS topic.
+- [ ] Define and implement the message-filtering strategy for routing task types into the correct queue.
+- [ ] Expose queue URLs, ARNs, and any policy outputs required by compute modules.
+- [ ] Document any required SNS message attributes or payload conventions that upstream publishers must satisfy.
+- [ ] Add native `terraform test` coverage for both matching and non-matching task publications.
+
+### Definition of Done
+
+- The module reliably receives only the intended task messages from the shared task topic.
+- The module exposes a stable interface that compute modules can consume without needing to understand routing internals.
+- DLQ and retry behavior are configured and test-backed.
+
+### Tests
+
+- `terraform test` that publishes at least one matching and one non-matching task message.
+- Assertions that matching messages arrive in the queue.
+- Assertions that non-matching messages are filtered out.
+- Assertions that queue outputs and policies are present and usable by downstream compute resources.
+
+## Phase 5: Python Fargate Launcher Lambda
+
+### Overview
+
+The launcher is reusable control-plane code that reacts to task-available notifications and starts ECS/Fargate workers. It should remain generic by treating the worker container as a deployable unit described by configuration, not by embedded task logic.
+
+The launcher's job is narrow:
+
+- receive a signal that task work is available
+- derive the correct ECS `RunTask` request
+- pass enough metadata for the worker to find and process queue items
+
+This Lambda should not interpret workflow-specific task payloads. It only needs to supply queue identity, run context, and runtime configuration to the worker task.
+
+### Checklist
+
+- [ ] Implement the SNS-triggered Lambda entrypoint for task-available events.
+- [ ] Define the configuration contract for ECS cluster, task definition, launch type, networking, and queue metadata.
+- [ ] Build the ECS `RunTask` request using injected configuration and event context.
+- [ ] Pass queue metadata and any required run/task context through container overrides or environment variables.
+- [ ] Define behavior for duplicate notifications so the launcher remains safe under at-least-once delivery.
+- [ ] Define behavior for ECS launch failures, transient AWS API failures, and invalid configuration.
+- [ ] Keep the launcher logic independent of workflow-specific task schemas.
+
+### Definition of Done
+
+- The launcher can convert a task-available event into the correct ECS launch request under unit test.
+- The configuration contract is explicit enough for Terraform to supply everything needed without code changes.
+- Duplicate or failed launch scenarios have defined handling behavior.
+
+### Tests
+
+- `pytest` tests for SNS event parsing.
+- `pytest` tests for ECS `RunTask` request construction.
+- `pytest` tests for configuration lookup and container override generation.
+- `pytest` tests for duplicate-notification handling.
+- `pytest` tests for failure paths, including ECS API errors and invalid config.
+
+## Phase 6: Terraform Fargate Compute Module
+
+### Overview
+
+This module packages the reusable compute plane that sits behind a task queue. It includes the launcher Lambda from Phase 5 plus the ECS/Fargate resources needed to run a worker container. The reusable module should be agnostic to task content and should accept a container image reference as an input.
+
+This phase must also prove that the deployed compute path actually works in AWS. That means the tests need a generic example worker image that consumes queue work and leaves an observable side effect behind.
+
+### Checklist
+
+- [ ] Create the `fargate-compute` Terraform module structure.
+- [ ] Provision launcher subscription wiring, ECS task definition, IAM, logging, and required networking inputs.
+- [ ] Accept a container image URI as an input instead of building container images inside the module.
+- [ ] Wire the module to the `task-queue` outputs and shared task topic conventions.
+- [ ] Add a lightweight generic example worker image for integration tests.
+- [ ] Define the observable side effect used by tests to prove worker execution.
+- [ ] Add native `terraform test` coverage that publishes a task and verifies that an ECS task is launched and the example worker completes the expected side effect.
+
+### Definition of Done
+
+- The module can launch a real example Fargate worker from an incoming task signal.
+- The compute module interface is generic enough to support different worker images without code changes.
+- The integration test proves behavior end-to-end rather than only checking resource existence.
+
+### Tests
+
+- `terraform test` that provisions the module with a generic example worker image.
+- Assertions that a matching task publication leads to an ECS task launch.
+- Assertions that the example worker leaves the expected observable side effect.
+- Assertions that the launcher and worker receive the configuration they need from Terraform inputs.
+
+## Phase 7: Python Web Interaction Scaffold
+
+### Overview
+
+The web interaction Lambda is the reusable edge for workflow submission. Its reusable responsibilities are request validation, run/output location allocation, response construction, and publication of orchestration messages. Workflow-specific graph construction must be injected behind a clear adapter so the Lambda can support many workflows.
+
+The conceptual boundary is important:
+
+- the reusable shell handles transport, identifiers, storage locations, and messaging
+- the workflow-specific adapter converts validated input details into one or more orchestration tasks
+
+That keeps the website-facing code generic while still allowing each workflow to define its own graph.
+
+### Checklist
+
+- [ ] Implement reusable request parsing around `InputsMessage`.
+- [ ] Implement generation of `run_id` and any output-location conventions used by the platform.
+- [ ] Implement construction of `OutputsMessage`, including output URL mappings and polling guidance.
+- [ ] Implement publishing of the initial orchestration message to the orchestration queue.
+- [ ] Define an adapter or protocol for workflow-specific graph construction.
+- [ ] Add a minimal generic example adapter used only for tests.
+- [ ] Keep all OpenFold/OpenFE-specific graph logic out of the reusable scaffold.
+- [ ] Define the HTTP response shape and error behavior expected by the website.
+
+### Definition of Done
+
+- A reusable web-entry shell exists that can accept a request, allocate run/output locations, enqueue orchestration work, and return a valid response.
+- Workflow-specific graph construction is injected through an explicit interface rather than embedded in the Lambda.
+- The scaffold can be reused by future workflows without changing the shared shell code.
+
+### Tests
+
+- `pytest` tests for request validation and response generation.
+- `pytest` tests for output URL allocation behavior.
+- `pytest` tests for orchestration queue publication.
+- `pytest` tests for error responses and invalid input handling.
+- `pytest` tests for the workflow-adapter boundary using the minimal example adapter.
+
+## Phase 8: Terraform Web Interface Module
+
+### Overview
+
+This module deploys the public-facing website integration layer: the web Lambda, its Function URL, and the input/output storage used by the workflow platform. Its test must prove the first end-to-end handoff into orchestration.
+
+This module is where the platform becomes externally visible. Because of that, its integration test should validate both the HTTP response contract and the side effect that the request creates in the orchestration system.
+
+### Checklist
+
+- [ ] Create the `web-interface` Terraform module structure.
+- [ ] Provision the web Lambda, Function URL, input/output buckets, IAM permissions, logging, and orchestration queue access.
+- [ ] Wire the module to deploy the Phase 7 Lambda artifact.
+- [ ] Expose the Function URL and relevant bucket outputs needed by the website.
+- [ ] Define any bucket prefix conventions required by the reusable platform layer.
+- [ ] Add native `terraform test` coverage that invokes the deployed Function URL with a generic sample input.
+- [ ] Assert that the response matches the documented output contract.
+- [ ] Assert that the request results in an orchestration message reaching the orchestration queue.
+
+### Definition of Done
+
+- The deployed web interface can accept a request in AWS and hand work off to orchestration successfully.
+- The response format is stable enough for website integration.
+- Storage and queue permissions are narrow and sufficient for the reusable shell behavior.
+
+### Tests
+
+- `terraform test` that invokes the deployed Function URL.
+- Assertions that the response contains the expected identifiers and output URL mappings.
+- Assertions that the orchestration queue receives the expected message.
+- Assertions that the module outputs are sufficient for website integration.
+
+## Cross-Phase Test Plan
+
+- All Python phases use `pytest` and should run through the repo's `pixi` dev environment.
+- All Terraform phases use native `terraform test` against a real AWS sandbox account.
+- Terraform tests must assert behavior, not just resource shape.
+- Integration tests should favor observable outcomes such as:
+  - queue delivery
+  - SNS fanout
+  - Lambda execution
+  - ECS task launch
+  - persisted graph state
+  - HTTP response shape
+  - durable side effects created by example runtimes
+- Example Lambda and Fargate artifacts used in tests should stay generic and should not encode workflow-specific scientific logic.
+
+## How To Extend This Plan
+
+When updating this document:
+
+- keep the same phase template: `Overview`, `Checklist`, `Definition of Done`, `Tests`
+- add new phases only when the work is large enough to stand as its own PR
+- prefer generic platform concepts over workflow-specific implementation details
+- record any new shared interface decisions in `Public Interfaces and Contracts`
+- update `Assumptions and Defaults` only when the repo intentionally changes direction
+
+If future work introduces a specific workflow, document it in a separate workflow-specific plan rather than expanding this reusable platform plan with task-specific details.
