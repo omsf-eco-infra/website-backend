@@ -1,6 +1,6 @@
 # Reusable Workflow Architecture Plan
 
-This is a living implementation plan for the reusable AWS workflow platform described in pages 1-6 of [May 2026 Demo_ Architecture Plan-2.pdf](/Users/dwhs/Dropbox/omsf/eco-infra/src/website-backend/May%202026%20Demo_%20Architecture%20Plan-2.pdf). It intentionally excludes all OpenFold/OpenFE-specific workflow logic. The goal is to turn the non-specific platform architecture into reusable building blocks that can support multiple future workflows.
+This is a living implementation plan for the reusable AWS workflow platform described in pages 1-6 of the "May 2026 Demo_ Architecture Plan-2.pdf" document. It intentionally excludes all OpenFold/OpenFE-specific workflow logic. The goal is to turn the non-specific platform architecture into reusable building blocks that can support multiple future workflows.
 
 ## Summary
 
