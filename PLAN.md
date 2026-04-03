@@ -91,14 +91,34 @@ This phase should also define how repo-level tooling supports both Python unit t
 
 ### Checklist
 
-- [ ] Define the long-term repo layout for reusable Python runtime code, Terraform modules, Terraform test fixtures, and example artifacts.
-- [ ] Define naming conventions for Lambda packages, example worker images, helper scripts, and test assets.
-- [ ] Document shared environment variables and configuration inputs used across Python and Terraform code.
-- [ ] Define how helper scripts are invoked from `terraform test` for packaging Lambdas, invoking Function URLs, publishing messages, polling queues, and asserting side effects.
+- [x] Define the long-term repo layout for reusable Python runtime code, Terraform modules, Terraform test fixtures, and example artifacts.
+- [x] Define naming conventions for Lambda images, example worker images, helper scripts, and test assets.
+- [x] Document shared environment variables and configuration inputs used across Python and Terraform code.
+- [ ] Define how helper scripts are invoked from `terraform test` for publishing Lambda images, invoking Function URLs, publishing messages, polling queues, and asserting side effects.
 - [ ] Define real-AWS sandbox naming, tagging, and teardown rules so test resources are easy to isolate and clean up.
 - [ ] Document how `pixi` environments should be used for Python development and test execution.
 - [ ] Add any repo-level fixtures or helper directories that later phases will reuse.
 - [ ] Add guidance on how future edits should extend this plan without changing the phase template.
+
+### Established Conventions
+
+- Repo layout:
+  - reusable Python runtime code stays in `src/website_backend/`
+  - Python unit tests stay in `tests/py/`
+  - reusable Terraform modules live in top-level `modules/`
+  - native `terraform test` fixtures live in `tests/tf/`
+  - generic example assets and container contexts live in top-level `examples/`
+- Naming conventions:
+  - Python package/import names stay in underscore form as `website_backend`
+  - Terraform module directories use hyphenated names that match the module interface names in this plan: `orchestration`, `task-queue`, `fargate-compute`, `web-interface`
+  - Lambda functions, ECR repositories, and example worker images use hyphenated role names derived from the component, for example `website-backend-orchestrator`, `website-backend-web-interface`, `website-backend-fargate-launcher`, and `website-backend-example-worker`
+  - helper scripts use verb-object snake_case names such as `publish_message.py`, `poll_queue.py`, and `invoke_function_url.py`
+  - sample payloads and other test assets use snake_case family names plus dot-delimited scenarios, for example `inputs_message.valid.json` and `task_message.matching.json`
+- Runtime configuration:
+  - deployment-specific values are injected per Lambda function or per ECS task definition, not at image build time
+  - document only the environment variables a given runtime consumes; do not define one global superset that every runtime receives
+  - use descriptive resource-oriented names without a repo prefix, such as `CONTRACT_VERSION`, `WORKFLOW_NAME`, `STATE_BUCKET`, `STATE_PREFIX`, `TASK_TOPIC_ARN`, `ORCHESTRATION_QUEUE_URL`, `INPUTS_BUCKET`, `OUTPUTS_BUCKET`, `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `SUBNET_IDS`, and `SECURITY_GROUP_IDS`
+  - keep secrets out of this shared contract; later phases should use AWS secret-management mechanisms if they introduce secrets
 
 ### Definition of Done
 
@@ -187,18 +207,18 @@ To stay reusable, the Lambda should depend on clear adapters for persistence, Ex
 
 ### Overview
 
-This module packages the reusable orchestration core for deployment. Its value is not just that it creates AWS resources, but that it deploys executable orchestrator code and proves that the deployed code can process real messages in AWS.
+This module deploys the reusable orchestration core. Its value is not just that it creates AWS resources, but that it deploys executable orchestrator code and proves that the deployed code can process real messages in AWS.
 
-This is the first Terraform phase that must treat code packaging and deployed behavior as part of the module contract. The module should not stop at queues, topics, and IAM. It also needs to make the Phase 2 Lambda artifact deployable and testable.
+This is the first Terraform phase that must treat Lambda image wiring and deployed behavior as part of the module contract. The module should not stop at queues, topics, and IAM. It also needs to make the Phase 2 Lambda image deployable and testable.
 
 ### Checklist
 
 - [ ] Create the `orchestration` Terraform module structure.
-- [ ] Define inputs for the orchestration queue, shared task topic behavior, Lambda packaging, state-store bucket/key configuration, and tagging.
+- [ ] Define inputs for the orchestration queue, shared task topic behavior, Lambda image configuration, state-store bucket/key configuration, and tagging.
 - [ ] Provision the orchestration SQS queue, orchestrator Lambda, IAM permissions, log group, and SNS topic integration required by the architecture.
-- [ ] Wire the module to deploy the Phase 2 Lambda artifact.
+- [ ] Wire the module to deploy the Phase 2 Lambda image.
 - [ ] Expose outputs required by downstream `task-queue` and `web-interface` modules.
-- [ ] Define how the module receives artifact paths or package references during tests and deployments.
+- [ ] Define how the module receives image references during tests and deployments.
 - [ ] Add native `terraform test` coverage that publishes a sample orchestration message into AWS.
 - [ ] Assert that the deployed Lambda runs, publishes task output onto the shared task topic, and persists graph state to the configured store.
 
@@ -365,7 +385,7 @@ This module is where the platform becomes externally visible. Because of that, i
 
 - [ ] Create the `web-interface` Terraform module structure.
 - [ ] Provision the web Lambda, Function URL, input/output buckets, IAM permissions, logging, and orchestration queue access.
-- [ ] Wire the module to deploy the Phase 7 Lambda artifact.
+- [ ] Wire the module to deploy the Phase 7 Lambda image.
 - [ ] Expose the Function URL and relevant bucket outputs needed by the website.
 - [ ] Define any bucket prefix conventions required by the reusable platform layer.
 - [ ] Add native `terraform test` coverage that invokes the deployed Function URL with a generic sample input.

@@ -1,0 +1,17 @@
+{
+  "version": "2026-05",
+  "graph_id": "graph-123",
+  "message_type": "ADD_TASKS",
+  "details": {
+    "tasks": [
+      {
+        "task_id": "task-1",
+        "requirements": [],
+        "task_type": "example_worker",
+        "details": {
+          "result_key": "runs/graph-123/task-1/result.json"
+        }
+      }
+    ]
+  }
+}

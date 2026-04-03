@@ -1,0 +1,10 @@
+{
+  "version": "2026-05",
+  "graph_id": "graph-123",
+  "task_id": "task-1",
+  "task_type": "example_worker",
+  "attempt": 1,
+  "task_details": {
+    "result_key": "runs/graph-123/task-1/result.json"
+  }
+}
