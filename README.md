@@ -9,14 +9,14 @@ This repository is building reusable AWS workflow-platform components. Phase 0 l
 - `modules/`: reusable Terraform modules
 - `tests/tf/`: native `terraform test` fixtures and assertions
 - `examples/`: generic example payloads, assets, and container contexts
-- `scripts/`: shared helper scripts when later Phase 0 work adds them
+- `scripts/`: shell helpers if a future phase needs them
 
 ## Naming conventions
 
 - Python imports stay under `website_backend.*`.
 - Terraform module directories stay hyphenated and match the public module names: `orchestration`, `task-queue`, `fargate-compute`, and `web-interface`.
 - Lambda functions, ECR repositories, and example worker images use hyphenated role names derived from the component, for example `website-backend-orchestrator`, `website-backend-web-interface`, `website-backend-fargate-launcher`, and `website-backend-example-worker`.
-- Helper scripts use verb-object snake_case names, for example `publish_message.py`, `poll_queue.py`, and `invoke_function_url.py`.
+- Python helper modules use snake_case names under `website_backend.testing.*`.
 - Example payloads and test assets use snake_case family names plus dot-delimited scenarios, for example `inputs_message.valid.json` and `task_message.matching.json`.
 
 ## Runtime configuration
@@ -66,3 +66,28 @@ Run the existing Python tests through Pixi:
 ```bash
 pixi run -e dev python -m pytest tests/py
 ```
+
+## OpenTofu test harness
+
+Infra tests run through Pixi so the Python helper dependencies are available. Run `tofu test` from the concrete harness root:
+
+```bash
+pixi run -e dev tofu -chdir=tests/tf/support/smoke init
+pixi run -e dev tofu -chdir=tests/tf/support/smoke test -test-directory=.
+```
+
+Conventions:
+
+- `tests/tf/<module-name>/`: module-specific harness roots with OpenTofu configuration and `*.tftest.hcl` files
+- `tests/tf/support/modules/`: shared wrapper modules around `website_backend.testing.*`
+- `tests/tf/support/smoke/`: local smoke test for the helper harness pattern
+- `.tf-test-artifacts/`: ignored JSON artifacts written by mutating helper wrappers
+
+Helper rules:
+
+- Test helpers are invoked as `python -m website_backend.testing.<module>`.
+- Helper scripts accept explicit CLI flags and file arguments.
+- Successful helpers print exactly one JSON object to stdout.
+- Helpers write human diagnostics to stderr.
+- Read helpers support `--external-output`, which wraps their structured result as a JSON string for the OpenTofu `external` provider.
+- The shared harness does not publish Lambda images; image build/publish behavior remains part of the relevant Terraform modules.

@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pre-commit", "pytest", "pytest-cov", "ruff"]
+dev = ["moto", "pre-commit", "pytest", "pytest-cov", "requests", "ruff"]
 
 [build-system]
 build-backend = "hatchling.build"

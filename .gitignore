@@ -32,6 +32,7 @@ venv/
 
 # Terraform / OpenTofu
 .terraform/
+.tf-test-artifacts/
 *.tfstate
 *.tfstate.*
 *.tfvars

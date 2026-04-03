@@ -94,7 +94,7 @@ This phase should also define how repo-level tooling supports both Python unit t
 - [x] Define the long-term repo layout for reusable Python runtime code, Terraform modules, Terraform test fixtures, and example artifacts.
 - [x] Define naming conventions for Lambda images, example worker images, helper scripts, and test assets.
 - [x] Document shared environment variables and configuration inputs used across Python and Terraform code.
-- [ ] Define how helper scripts are invoked from `terraform test` for publishing Lambda images, invoking Function URLs, publishing messages, polling queues, and asserting side effects.
+- [x] Define how helper scripts are invoked from `terraform test` for publishing Lambda images, invoking Function URLs, publishing messages, polling queues, and asserting side effects.
 - [ ] Define real-AWS sandbox naming, tagging, and teardown rules so test resources are easy to isolate and clean up.
 - [ ] Document how `pixi` environments should be used for Python development and test execution.
 - [ ] Add any repo-level fixtures or helper directories that later phases will reuse.
@@ -112,13 +112,20 @@ This phase should also define how repo-level tooling supports both Python unit t
   - Python package/import names stay in underscore form as `website_backend`
   - Terraform module directories use hyphenated names that match the module interface names in this plan: `orchestration`, `task-queue`, `fargate-compute`, `web-interface`
   - Lambda functions, ECR repositories, and example worker images use hyphenated role names derived from the component, for example `website-backend-orchestrator`, `website-backend-web-interface`, `website-backend-fargate-launcher`, and `website-backend-example-worker`
-  - helper scripts use verb-object snake_case names such as `publish_message.py`, `poll_queue.py`, and `invoke_function_url.py`
+  - Python helper modules use snake_case names under `website_backend.testing`
   - sample payloads and other test assets use snake_case family names plus dot-delimited scenarios, for example `inputs_message.valid.json` and `task_message.matching.json`
 - Runtime configuration:
   - deployment-specific values are injected per Lambda function or per ECS task definition, not at image build time
   - document only the environment variables a given runtime consumes; do not define one global superset that every runtime receives
   - use descriptive resource-oriented names without a repo prefix, such as `CONTRACT_VERSION`, `WORKFLOW_NAME`, `STATE_BUCKET`, `STATE_PREFIX`, `TASK_TOPIC_ARN`, `ORCHESTRATION_QUEUE_URL`, `INPUTS_BUCKET`, `OUTPUTS_BUCKET`, `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `SUBNET_IDS`, and `SECURITY_GROUP_IDS`
   - keep secrets out of this shared contract; later phases should use AWS secret-management mechanisms if they introduce secrets
+- OpenTofu helper harness:
+  - infra tests run as `pixi run -e dev tofu -chdir=tests/tf/<module-name> test -test-directory=.`
+  - module-specific harness roots under `tests/tf/<module-name>/` contain the OpenTofu configuration plus `*.tftest.hcl` files, and shared wrapper modules live in `tests/tf/support/modules/`
+  - mutating helper wrappers use `terraform_data` plus `local-exec` and write JSON artifacts under `.tf-test-artifacts/<test-name>/`
+  - read/assert helper wrappers use the `external` provider plus `--external-output`, then `jsondecode(...)` the helper result for assertions
+  - helper modules are invoked as `python -m website_backend.testing.<module>` with explicit CLI flags and file arguments; successful runs write one JSON object to stdout and human diagnostics to stderr
+  - the shared harness does not publish Lambda images; image publishing remains part of the relevant module implementations and tests
 
 ### Definition of Done
 

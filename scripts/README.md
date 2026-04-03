@@ -1,5 +1,6 @@
-# Helper scripts
+# Scripts
 
-Shared helper scripts should live here when later Phase 0 work adds them.
+Python-based OpenTofu test helpers are invoked directly from the installed package as
+`python -m website_backend.testing.<module>`.
 
-Use verb-object snake_case names such as `publish_message.py`, `poll_queue.py`, and `invoke_function_url.py`.
+This directory is reserved for future shell helpers, if a later phase needs them.
