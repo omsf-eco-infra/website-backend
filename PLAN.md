@@ -67,7 +67,6 @@ The Terraform module boundaries should stay aligned with the architecture docume
 
 ## Assumptions and Defaults
 
-- Include an explicit `Phase 0` rather than folding setup work into feature phases.
 - Exclude all OpenFold/OpenFE-specific task types, metadata schemas, and workflow graphs from this plan.
 - Use one shared task SNS topic in v1, with downstream routing handled by queue subscriptions and filtering.
 - Keep `graph_id` distinct from `run_id` in the reusable contract, even if some initial workflows map them 1:1.
@@ -95,10 +94,8 @@ This phase should also define how repo-level tooling supports both Python unit t
 - [x] Define naming conventions for Lambda images, example worker images, helper scripts, and test assets.
 - [x] Document shared environment variables and configuration inputs used across Python and Terraform code.
 - [x] Define how helper scripts are invoked from `terraform test` for publishing Lambda images, invoking Function URLs, publishing messages, polling queues, and asserting side effects.
-- [ ] Define real-AWS sandbox naming, tagging, and teardown rules so test resources are easy to isolate and clean up.
-- [ ] Document how `pixi` environments should be used for Python development and test execution.
-- [ ] Add any repo-level fixtures or helper directories that later phases will reuse.
-- [ ] Add guidance on how future edits should extend this plan without changing the phase template.
+- [x] Define real-AWS sandbox naming, tagging, and teardown rules so test resources are easy to isolate and clean up.
+- [x] Add any repo-level fixtures or helper directories that later phases will reuse.
 
 ### Established Conventions
 
@@ -126,6 +123,16 @@ This phase should also define how repo-level tooling supports both Python unit t
   - read/assert helper wrappers use the `external` provider plus `--external-output`, then `jsondecode(...)` the helper result for assertions
   - helper modules are invoked as `python -m website_backend.testing.<module>` with explicit CLI flags and file arguments; successful runs write one JSON object to stdout and human diagnostics to stderr
   - the shared harness does not publish Lambda images; image publishing remains part of the relevant module implementations and tests
+- Real-AWS sandbox policy:
+  - real-AWS `tofu test` runs use per-run isolation by default rather than sharing mutable sandbox resources across independent runs
+  - test-created resource names use the template `wb-<module>-<owner>-<run_suffix>`, where `<owner>` is lowercase hyphenated text truncated to 12 characters and `<run_suffix>` is an 8-character lowercase alphanumeric value generated once per test run
+  - for resources with tighter name-length limits, preserve the `wb` prefix and unique suffix and truncate the middle
+  - for path-like identifiers such as S3 prefixes, use `tests/<module>/<owner>/<run_id>/...`
+  - tags are the source of truth for ownership and cleanup, and every test-created resource must include `managed_by=test-website-backend`, `repo=website-backend`, `module=<module>`, `test_name=<harness-or-scenario-name>`, `owner=<owner>`, `run_id=<run_id>`, `created_at=<UTC ISO-8601 timestamp>`, and `expires_at=<UTC ISO-8601 timestamp>`
+  - default behavior is destroy-on-completion for every run, with a `retain_on_failure` escape hatch for debugging
+  - normal runs set `expires_at` to 24 hours after creation; retained failure runs set `expires_at` to 72 hours after creation
+  - cleanup and debugging target `run_id` first, not ad hoc resource-name matching
+  - a janitor cleanup process is the safety net and should delete expired resources by selecting `managed_by=test-website-backend` and comparing `expires_at`
 
 ### Definition of Done
 
