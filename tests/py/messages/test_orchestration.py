@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
+from website_backend.messages import dump_message, dump_message_json
 from website_backend.messages.orchestration import (
     AddTasksMessage,
     TaskCompletedMessage,
@@ -41,6 +44,22 @@ def test_add_tasks_message_parses_and_defaults_requirements() -> None:
     assert isinstance(message, AddTasksMessage)
     assert message.details.tasks[0].requirements == []
     assert message.details.tasks[0].details == nested_details
+    assert dump_message(message) == {
+        "version": "2026-05",
+        "graph_id": "run-123",
+        "message_type": "ADD_TASKS",
+        "details": {
+            "tasks": [
+                {
+                    "task_id": "task-1",
+                    "requirements": [],
+                    "task_type": "openfold_predict",
+                    "details": nested_details,
+                }
+            ]
+        },
+    }
+    assert json.loads(dump_message_json(message)) == dump_message(message)
 
 
 @pytest.mark.parametrize(

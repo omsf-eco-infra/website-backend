@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
-from website_backend.messages.task import TaskMessage
+from website_backend.messages import (
+    TaskMessage,
+    dump_message,
+    dump_message_json,
+    validate_task_message,
+)
 
 
 def test_task_message_accepts_opaque_nested_details_and_round_trips() -> None:
@@ -14,7 +21,7 @@ def test_task_message_accepts_opaque_nested_details_and_round_trips() -> None:
             "flags": {"dry_run": False},
         },
     }
-    message = TaskMessage.model_validate(
+    message = validate_task_message(
         {
             "version": "2026-05",
             "task_type": "openfe_ligand_network",
@@ -26,12 +33,20 @@ def test_task_message_accepts_opaque_nested_details_and_round_trips() -> None:
     )
 
     assert message.task_details == nested_details
-    assert message.model_dump()["task_details"] == nested_details
+    assert dump_message(message) == {
+        "version": "2026-05",
+        "task_type": "openfe_ligand_network",
+        "task_id": "task-2",
+        "attempt": 1,
+        "graph_id": "run-123",
+        "task_details": nested_details,
+    }
+    assert json.loads(dump_message_json(message)) == dump_message(message)
 
 
 def test_task_message_rejects_non_positive_attempt() -> None:
     with pytest.raises(ValidationError):
-        TaskMessage.model_validate(
+        validate_task_message(
             {
                 "version": "2026-05",
                 "task_type": "openfe_ligand_network",
@@ -45,7 +60,7 @@ def test_task_message_rejects_non_positive_attempt() -> None:
 
 def test_task_message_rejects_extra_top_level_fields() -> None:
     with pytest.raises(ValidationError):
-        TaskMessage.model_validate(
+        validate_task_message(
             {
                 "version": "2026-05",
                 "task_type": "openfe_ligand_network",

@@ -1,20 +1,29 @@
 from __future__ import annotations
 
-__all__ = ["TaskMessage"]
+__all__ = ["TaskMessage", "validate_task_message"]
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
-from website_backend.messages.orchestration import NonEmptyStr
+from website_backend.messages.common import (
+    GraphId,
+    MessageModel,
+    OpaqueDetails,
+    TaskId,
+    TaskType,
+    Version,
+)
 
 
-class TaskMessage(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    version: NonEmptyStr
-    task_type: NonEmptyStr
-    task_id: NonEmptyStr
+class TaskMessage(MessageModel):
+    version: Version
+    task_type: TaskType
+    task_id: TaskId
     attempt: int = Field(gt=0)
-    graph_id: NonEmptyStr
-    task_details: dict[str, Any]
+    graph_id: GraphId
+    task_details: OpaqueDetails
+
+
+def validate_task_message(data: Any) -> TaskMessage:
+    return TaskMessage.model_validate(data)

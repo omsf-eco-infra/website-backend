@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__ = [
     "AddTasksDetails",
     "AddTasksMessage",
-    "NonEmptyStr",
     "OrchestrationMessage",
     "OrchestrationTaskSpec",
     "TaskCompletedDetails",
@@ -15,52 +14,56 @@ __all__ = [
 
 from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter
+from pydantic import Field, TypeAdapter
 
-NonEmptyStr = Annotated[str, StringConstraints(min_length=1)]
-
-
-class StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-
-class OrchestrationTaskSpec(StrictModel):
-    task_id: NonEmptyStr
-    requirements: list[NonEmptyStr] = Field(default_factory=list)
-    task_type: NonEmptyStr
-    details: dict[str, Any]
+from website_backend.messages.common import (
+    GraphId,
+    MessageModel,
+    NonEmptyStr,
+    OpaqueDetails,
+    TaskId,
+    TaskType,
+    Version,
+)
 
 
-class AddTasksDetails(StrictModel):
+class OrchestrationTaskSpec(MessageModel):
+    task_id: TaskId
+    requirements: list[TaskId] = Field(default_factory=list)
+    task_type: TaskType
+    details: OpaqueDetails
+
+
+class AddTasksDetails(MessageModel):
     tasks: list[OrchestrationTaskSpec]
 
 
-class TaskCompletedDetails(StrictModel):
-    task_id: NonEmptyStr
+class TaskCompletedDetails(MessageModel):
+    task_id: TaskId
 
 
-class TaskErrorDetails(StrictModel):
-    task_id: NonEmptyStr
+class TaskErrorDetails(MessageModel):
+    task_id: TaskId
     error_msg: NonEmptyStr
 
 
-class AddTasksMessage(StrictModel):
-    version: NonEmptyStr
-    graph_id: NonEmptyStr
+class AddTasksMessage(MessageModel):
+    version: Version
+    graph_id: GraphId
     message_type: Literal["ADD_TASKS"]
     details: AddTasksDetails
 
 
-class TaskCompletedMessage(StrictModel):
-    version: NonEmptyStr
-    graph_id: NonEmptyStr
+class TaskCompletedMessage(MessageModel):
+    version: Version
+    graph_id: GraphId
     message_type: Literal["TASK_COMPLETED"]
     details: TaskCompletedDetails
 
 
-class TaskErrorMessage(StrictModel):
-    version: NonEmptyStr
-    graph_id: NonEmptyStr
+class TaskErrorMessage(MessageModel):
+    version: Version
+    graph_id: GraphId
     message_type: Literal["TASK_ERROR"]
     details: TaskErrorDetails
 
