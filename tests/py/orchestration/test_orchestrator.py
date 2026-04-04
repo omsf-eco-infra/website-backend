@@ -2,75 +2,11 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 
+import pytest
 import sqlalchemy as sqla
 
-from website_backend.messages.orchestration import validate_orchestration_message
 from website_backend.orchestration.orchestrator import LocalOrchestrator, Orchestrator
 from website_backend.orchestration.taskdb import TaskStatusDB
-from website_backend.queues import QueueDelivery
-
-
-class StubOrchestrationQueue:
-    def __init__(self, messages):
-        self.messages = list(messages)
-        self.completed_deliveries = []
-
-    def get_message(self):
-        if not self.messages:
-            return None
-        message = self.messages.pop(0)
-        return QueueDelivery(
-            message=message,
-            ack_token=f"ack-{len(self.completed_deliveries)}-{len(self.messages)}",
-            message_id=None,
-            attributes={},
-            message_attributes={},
-            raw_body=None,
-        )
-
-    def mark_message_completed(self, delivery):
-        self.completed_deliveries.append(delivery)
-
-
-class StubTaskQueue:
-    def __init__(self):
-        self.messages = []
-
-    def add_message(self, message):
-        self.messages.append(message)
-
-
-def _add_tasks_message(graph_id, tasks):
-    return validate_orchestration_message(
-        {
-            "version": "2026-05",
-            "graph_id": graph_id,
-            "message_type": "ADD_TASKS",
-            "details": {"tasks": tasks},
-        }
-    )
-
-
-def _task_completed_message(graph_id, task_id):
-    return validate_orchestration_message(
-        {
-            "version": "2026-05",
-            "graph_id": graph_id,
-            "message_type": "TASK_COMPLETED",
-            "details": {"task_id": task_id},
-        }
-    )
-
-
-def _task_error_message(graph_id, task_id, error_msg="boom"):
-    return validate_orchestration_message(
-        {
-            "version": "2026-05",
-            "graph_id": graph_id,
-            "message_type": "TASK_ERROR",
-            "details": {"task_id": task_id, "error_msg": error_msg},
-        }
-    )
 
 
 class InMemoryOrchestrator(Orchestrator):
@@ -86,10 +22,14 @@ class InMemoryOrchestrator(Orchestrator):
 
 
 class TestOrchestrator:
+    @pytest.fixture(autouse=True)
+    def _support(self, orchestration_test_support) -> None:
+        self.support = orchestration_test_support
+
     def test_dispatches_ready_tasks_using_graph_id(self) -> None:
-        orchestration_queue = StubOrchestrationQueue(
+        orchestration_queue = self.support.orchestration_queue(
             [
-                _add_tasks_message(
+                self.support.add_tasks_message(
                     "run-123",
                     [
                         {
@@ -103,7 +43,7 @@ class TestOrchestrator:
                 )
             ]
         )
-        task_queue = StubTaskQueue()
+        task_queue = self.support.task_queue()
 
         orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
 
@@ -122,9 +62,9 @@ class TestOrchestrator:
         assert task_message.task_details == {"protein": "AAA"}
 
     def test_only_dispatches_newly_unblocked_tasks(self) -> None:
-        orchestration_queue = StubOrchestrationQueue(
+        orchestration_queue = self.support.orchestration_queue(
             [
-                _add_tasks_message(
+                self.support.add_tasks_message(
                     "run-123",
                     [
                         {
@@ -141,10 +81,10 @@ class TestOrchestrator:
                         },
                     ],
                 ),
-                _task_completed_message("run-123", "task-1"),
+                self.support.task_completed_message("run-123", "task-1"),
             ]
         )
-        task_queue = StubTaskQueue()
+        task_queue = self.support.task_queue()
 
         orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
 
@@ -160,9 +100,9 @@ class TestOrchestrator:
         assert len(orchestration_queue.completed_deliveries) == 2
 
     def test_isolates_backing_taskdbs_for_different_graph_ids(self) -> None:
-        orchestration_queue = StubOrchestrationQueue(
+        orchestration_queue = self.support.orchestration_queue(
             [
-                _add_tasks_message(
+                self.support.add_tasks_message(
                     "graph-a",
                     [
                         {
@@ -179,7 +119,7 @@ class TestOrchestrator:
                         },
                     ],
                 ),
-                _add_tasks_message(
+                self.support.add_tasks_message(
                     "graph-b",
                     [
                         {
@@ -196,10 +136,10 @@ class TestOrchestrator:
                         },
                     ],
                 ),
-                _task_completed_message("graph-a", "task-1"),
+                self.support.task_completed_message("graph-a", "task-1"),
             ]
         )
-        task_queue = StubTaskQueue()
+        task_queue = self.support.task_queue()
 
         orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
 
@@ -227,9 +167,9 @@ class TestOrchestrator:
         assert len(orchestration_queue.completed_deliveries) == 3
 
     def test_requeues_failed_task_with_incremented_attempt(self) -> None:
-        orchestration_queue = StubOrchestrationQueue(
+        orchestration_queue = self.support.orchestration_queue(
             [
-                _add_tasks_message(
+                self.support.add_tasks_message(
                     "run-123",
                     [
                         {
@@ -241,10 +181,10 @@ class TestOrchestrator:
                         }
                     ],
                 ),
-                _task_error_message("run-123", "task-1"),
+                self.support.task_error_message("run-123", "task-1"),
             ]
         )
-        task_queue = StubTaskQueue()
+        task_queue = self.support.task_queue()
 
         orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
 
@@ -261,11 +201,15 @@ class TestOrchestrator:
 
 
 class TestLocalOrchestrator:
+    @pytest.fixture(autouse=True)
+    def _support(self, orchestration_test_support) -> None:
+        self.support = orchestration_test_support
+
     def test_uses_absolute_graph_id_as_sqlite_filename(self, tmp_path) -> None:
         graph_id = tmp_path / "taskdb.sqlite"
-        orchestration_queue = StubOrchestrationQueue(
+        orchestration_queue = self.support.orchestration_queue(
             [
-                _add_tasks_message(
+                self.support.add_tasks_message(
                     str(graph_id),
                     [
                         {
@@ -282,10 +226,10 @@ class TestLocalOrchestrator:
                         },
                     ],
                 ),
-                _task_completed_message(str(graph_id), "task-1"),
+                self.support.task_completed_message(str(graph_id), "task-1"),
             ]
         )
-        task_queue = StubTaskQueue()
+        task_queue = self.support.task_queue()
 
         orchestrator = LocalOrchestrator(orchestration_queue, task_queue)
 
