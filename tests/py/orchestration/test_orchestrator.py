@@ -7,24 +7,37 @@ import sqlalchemy as sqla
 from website_backend.messages.orchestration import validate_orchestration_message
 from website_backend.orchestration.orchestrator import LocalOrchestrator, Orchestrator
 from website_backend.orchestration.taskdb import TaskStatusDB
+from website_backend.queues import QueueDelivery
 
 
 class StubOrchestrationQueue:
     def __init__(self, messages):
         self.messages = list(messages)
+        self.completed_deliveries = []
 
     def get_message(self):
         if not self.messages:
-            return None, None
-        return self.messages.pop(0)
+            return None
+        message = self.messages.pop(0)
+        return QueueDelivery(
+            message=message,
+            ack_token=f"ack-{len(self.completed_deliveries)}-{len(self.messages)}",
+            message_id=None,
+            attributes={},
+            message_attributes={},
+            raw_body=None,
+        )
+
+    def mark_message_completed(self, delivery):
+        self.completed_deliveries.append(delivery)
 
 
 class StubTaskQueue:
     def __init__(self):
         self.messages = []
 
-    def add_message(self, message, metadata):
-        self.messages.append((message, metadata))
+    def add_message(self, message):
+        self.messages.append(message)
 
 
 def _add_tasks_message(graph_id, tasks):
@@ -73,27 +86,20 @@ class InMemoryOrchestrator(Orchestrator):
 
 
 class TestOrchestrator:
-    def test_dispatches_ready_tasks_using_graph_id_not_metadata_taskdb(self) -> None:
-        metadata = {
-            "source": "unit-test",
-            "taskdb": "/tmp/should-not-be-used.sqlite",
-        }
+    def test_dispatches_ready_tasks_using_graph_id(self) -> None:
         orchestration_queue = StubOrchestrationQueue(
             [
-                (
-                    _add_tasks_message(
-                        "run-123",
-                        [
-                            {
-                                "task_id": "task-1",
-                                "requirements": [],
-                                "max_tries": 2,
-                                "task_type": "openfold_predict",
-                                "details": {"protein": "AAA"},
-                            }
-                        ],
-                    ),
-                    metadata,
+                _add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "max_tries": 2,
+                            "task_type": "openfold_predict",
+                            "details": {"protein": "AAA"},
+                        }
+                    ],
                 )
             ]
         )
@@ -105,9 +111,9 @@ class TestOrchestrator:
         assert orchestrator.process() is None
         assert len(task_queue.messages) == 1
         assert set(orchestrator.engines) == {"run-123"}
+        assert len(orchestration_queue.completed_deliveries) == 1
 
-        task_message, task_metadata = task_queue.messages[0]
-        assert task_metadata == metadata
+        task_message = task_queue.messages[0]
         assert task_message.version == "2026-05"
         assert task_message.graph_id == "run-123"
         assert task_message.task_id == "task-1"
@@ -116,33 +122,26 @@ class TestOrchestrator:
         assert task_message.task_details == {"protein": "AAA"}
 
     def test_only_dispatches_newly_unblocked_tasks(self) -> None:
-        metadata = {}
         orchestration_queue = StubOrchestrationQueue(
             [
-                (
-                    _add_tasks_message(
-                        "run-123",
-                        [
-                            {
-                                "task_id": "task-1",
-                                "requirements": [],
-                                "task_type": "prepare_inputs",
-                                "details": {"step": 1},
-                            },
-                            {
-                                "task_id": "task-2",
-                                "requirements": ["task-1"],
-                                "task_type": "run_model",
-                                "details": {"step": 2},
-                            },
-                        ],
-                    ),
-                    metadata,
+                _add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "task_type": "prepare_inputs",
+                            "details": {"step": 1},
+                        },
+                        {
+                            "task_id": "task-2",
+                            "requirements": ["task-1"],
+                            "task_type": "run_model",
+                            "details": {"step": 2},
+                        },
+                    ],
                 ),
-                (
-                    _task_completed_message("run-123", "task-1"),
-                    metadata,
-                ),
+                _task_completed_message("run-123", "task-1"),
             ]
         )
         task_queue = StubTaskQueue()
@@ -150,59 +149,54 @@ class TestOrchestrator:
         orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
 
         assert orchestrator.process() is True
-        assert [message.task_id for message, _ in task_queue.messages] == ["task-1"]
+        assert [message.task_id for message in task_queue.messages] == ["task-1"]
 
         assert orchestrator.process() is True
-        assert [message.task_id for message, _ in task_queue.messages] == [
+        assert [message.task_id for message in task_queue.messages] == [
             "task-1",
             "task-2",
         ]
-        assert task_queue.messages[1][0].attempt == 1
+        assert task_queue.messages[1].attempt == 1
+        assert len(orchestration_queue.completed_deliveries) == 2
 
     def test_isolates_backing_taskdbs_for_different_graph_ids(self) -> None:
         orchestration_queue = StubOrchestrationQueue(
             [
-                (
-                    _add_tasks_message(
-                        "graph-a",
-                        [
-                            {
-                                "task_id": "task-1",
-                                "requirements": [],
-                                "task_type": "prepare_inputs",
-                                "details": {"graph": "a", "step": 1},
-                            },
-                            {
-                                "task_id": "task-2",
-                                "requirements": ["task-1"],
-                                "task_type": "run_model",
-                                "details": {"graph": "a", "step": 2},
-                            },
-                        ],
-                    ),
-                    {},
+                _add_tasks_message(
+                    "graph-a",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "task_type": "prepare_inputs",
+                            "details": {"graph": "a", "step": 1},
+                        },
+                        {
+                            "task_id": "task-2",
+                            "requirements": ["task-1"],
+                            "task_type": "run_model",
+                            "details": {"graph": "a", "step": 2},
+                        },
+                    ],
                 ),
-                (
-                    _add_tasks_message(
-                        "graph-b",
-                        [
-                            {
-                                "task_id": "task-1",
-                                "requirements": [],
-                                "task_type": "prepare_inputs",
-                                "details": {"graph": "b", "step": 1},
-                            },
-                            {
-                                "task_id": "task-2",
-                                "requirements": ["task-1"],
-                                "task_type": "run_model",
-                                "details": {"graph": "b", "step": 2},
-                            },
-                        ],
-                    ),
-                    {},
+                _add_tasks_message(
+                    "graph-b",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "task_type": "prepare_inputs",
+                            "details": {"graph": "b", "step": 1},
+                        },
+                        {
+                            "task_id": "task-2",
+                            "requirements": ["task-1"],
+                            "task_type": "run_model",
+                            "details": {"graph": "b", "step": 2},
+                        },
+                    ],
                 ),
-                (_task_completed_message("graph-a", "task-1"), {}),
+                _task_completed_message("graph-a", "task-1"),
             ]
         )
         task_queue = StubTaskQueue()
@@ -211,12 +205,12 @@ class TestOrchestrator:
 
         assert orchestrator.process() is True
         assert [
-            (message.graph_id, message.task_id) for message, _ in task_queue.messages
+            (message.graph_id, message.task_id) for message in task_queue.messages
         ] == [("graph-a", "task-1")]
 
         assert orchestrator.process() is True
         assert [
-            (message.graph_id, message.task_id) for message, _ in task_queue.messages
+            (message.graph_id, message.task_id) for message in task_queue.messages
         ] == [
             ("graph-a", "task-1"),
             ("graph-b", "task-1"),
@@ -224,36 +218,30 @@ class TestOrchestrator:
 
         assert orchestrator.process() is True
         assert [
-            (message.graph_id, message.task_id) for message, _ in task_queue.messages
+            (message.graph_id, message.task_id) for message in task_queue.messages
         ] == [
             ("graph-a", "task-1"),
             ("graph-b", "task-1"),
             ("graph-a", "task-2"),
         ]
+        assert len(orchestration_queue.completed_deliveries) == 3
 
     def test_requeues_failed_task_with_incremented_attempt(self) -> None:
-        metadata = {}
         orchestration_queue = StubOrchestrationQueue(
             [
-                (
-                    _add_tasks_message(
-                        "run-123",
-                        [
-                            {
-                                "task_id": "task-1",
-                                "requirements": [],
-                                "max_tries": 2,
-                                "task_type": "run_model",
-                                "details": {"step": 1},
-                            }
-                        ],
-                    ),
-                    metadata,
+                _add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "max_tries": 2,
+                            "task_type": "run_model",
+                            "details": {"step": 1},
+                        }
+                    ],
                 ),
-                (
-                    _task_error_message("run-123", "task-1"),
-                    metadata,
-                ),
+                _task_error_message("run-123", "task-1"),
             ]
         )
         task_queue = StubTaskQueue()
@@ -261,44 +249,40 @@ class TestOrchestrator:
         orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
 
         assert orchestrator.process() is True
-        assert task_queue.messages[0][0].attempt == 1
+        assert task_queue.messages[0].attempt == 1
 
         assert orchestrator.process() is True
-        assert [message.task_id for message, _ in task_queue.messages] == [
+        assert [message.task_id for message in task_queue.messages] == [
             "task-1",
             "task-1",
         ]
-        assert task_queue.messages[1][0].attempt == 2
+        assert task_queue.messages[1].attempt == 2
+        assert len(orchestration_queue.completed_deliveries) == 2
 
 
 class TestLocalOrchestrator:
     def test_uses_absolute_graph_id_as_sqlite_filename(self, tmp_path) -> None:
         graph_id = tmp_path / "taskdb.sqlite"
-        ignored_metadata_path = tmp_path / "ignored-taskdb.sqlite"
-        metadata = {"taskdb": str(ignored_metadata_path), "source": "unit-test"}
         orchestration_queue = StubOrchestrationQueue(
             [
-                (
-                    _add_tasks_message(
-                        str(graph_id),
-                        [
-                            {
-                                "task_id": "task-1",
-                                "requirements": [],
-                                "task_type": "prepare_inputs",
-                                "details": {"step": 1},
-                            },
-                            {
-                                "task_id": "task-2",
-                                "requirements": ["task-1"],
-                                "task_type": "run_model",
-                                "details": {"step": 2},
-                            },
-                        ],
-                    ),
-                    metadata,
+                _add_tasks_message(
+                    str(graph_id),
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "task_type": "prepare_inputs",
+                            "details": {"step": 1},
+                        },
+                        {
+                            "task_id": "task-2",
+                            "requirements": ["task-1"],
+                            "task_type": "run_model",
+                            "details": {"step": 2},
+                        },
+                    ],
                 ),
-                (_task_completed_message(str(graph_id), "task-1"), metadata),
+                _task_completed_message(str(graph_id), "task-1"),
             ]
         )
         task_queue = StubTaskQueue()
@@ -307,18 +291,18 @@ class TestLocalOrchestrator:
 
         assert orchestrator.process() is True
         assert graph_id.exists()
-        assert not ignored_metadata_path.exists()
         assert [
-            (message.graph_id, message.task_id) for message, _ in task_queue.messages
+            (message.graph_id, message.task_id) for message in task_queue.messages
         ] == [(str(graph_id), "task-1")]
 
         assert orchestrator.process() is True
         assert [
-            (message.graph_id, message.task_id) for message, _ in task_queue.messages
+            (message.graph_id, message.task_id) for message in task_queue.messages
         ] == [
             (str(graph_id), "task-1"),
             (str(graph_id), "task-2"),
         ]
+        assert len(orchestration_queue.completed_deliveries) == 2
 
         reopened = TaskStatusDB.from_filename(graph_id)
         assert reopened.get_task_type("task-2") == "run_model"
