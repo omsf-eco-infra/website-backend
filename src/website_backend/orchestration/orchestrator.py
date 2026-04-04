@@ -1,28 +1,14 @@
-from contextlib import contextmanager
-from datetime import datetime
-
-from . import orchestrationmessages as msgs
-from .taskmessage import TaskMessage
-
-from exapaths.taskdb import TaskStatusDB
-
 import logging
+from contextlib import contextmanager
+
+from website_backend.messages.task import TaskMessage
+
+from .taskdb import TaskStatusDB
 
 _logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
-    DISPATCH = {
-        "COMPLETED": msgs.TaskCompleted,
-        "INCOMPLETE": msgs.TaskIncomplete,
-        "ERRORED": msgs.TaskErrored,
-        "ADDTASKS": msgs.AddTasks,
-        "ACKNOWLEDGE": msgs.Acknowledge,
-        # "ACQUIRELOCKS": msgs.AcquireLocks,
-        # "RELEASELOCKS": msgs.ReleaseLocks,
-        # "ACQUIRELOCKANDCREATETASK": msgs.AcquireLockAndCreateTask,
-    }
-
     def __init__(self, orchestration_queue, task_queue):
         self.orchestration_queue = orchestration_queue
         self.task_queue = task_queue
@@ -33,36 +19,34 @@ class Orchestrator:
 
     def process(self):
         msg, metadata = self.orchestration_queue.get_message()
-        _logger.debug(f"Received message: {msg}")
-        _logger.debug(f"Metadata: {metadata}")
-        tasks = []
+        _logger.debug("Received message: %s", msg)
+        _logger.debug("Metadata: %s", metadata)
         if msg is None:
             return None
 
+        tasks = []
         with self.taskdb(metadata) as taskdb:
             msg.process(taskdb)
-            # tell taskdb to check out all tasks, then we submit them to the
-            # queue
             while task_id := taskdb.check_out_task():
-                _logger.debug(f"Checked out task {task_id}")
-                ...  # get the rest of the info to make the task message
-                task_type = taskdb.get_task_type(task_id)
-                resources = []  # TODO: we should be able to extract this
+                _logger.debug("Checked out task %s", task_id)
                 tasks.append(
                     TaskMessage(
-                        task_type=task_type, task_id=task_id, task_resources=resources
+                        version=msg.version,
+                        task_type=taskdb.get_task_type(task_id),
+                        task_id=task_id,
+                        attempt=taskdb.get_task_attempt(task_id),
+                        graph_id=msg.graph_id,
+                        task_details=taskdb.get_task_details(task_id),
                     )
                 )
 
         for task in tasks:
-            _logger.debug(f"Adding to task queue: {task}")
+            _logger.debug("Adding to task queue: %s", task)
             self.task_queue.add_message(task, metadata)
 
         return True
 
     def __call__(self):
-        # on AWS, we might add time limits here for extra safety
-        # could also consider a local daemon version with a while True
         while self.process():
             pass
 
@@ -71,7 +55,7 @@ class LocalOrchestrator(Orchestrator):
     @contextmanager
     def taskdb(self, metadata):
         taskdb_file = metadata["taskdb"]
-        _logger.debug(f"Using {taskdb_file} as task status DB")
+        _logger.debug("Using %s as task status DB", taskdb_file)
         taskdb = TaskStatusDB.from_filename(taskdb_file)
         yield taskdb
-        _logger.debug(f"Done with {taskdb_file}")
+        _logger.debug("Done with %s", taskdb_file)
