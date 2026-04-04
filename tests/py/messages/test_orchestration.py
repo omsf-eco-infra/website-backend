@@ -269,3 +269,15 @@ class TestOrchestrationMessage:
                     "unexpected": "value",
                 }
             )
+
+    def test_rejects_separate_run_id_field(self) -> None:
+        with pytest.raises(ValidationError):
+            validate_orchestration_message(
+                {
+                    "version": "2026-05",
+                    "graph_id": "run-123",
+                    "run_id": "run-123",
+                    "message_type": "TASK_COMPLETED",
+                    "details": {"task_id": "task-2"},
+                }
+            )

@@ -38,7 +38,7 @@ These contracts should be treated as stable early so later phases do not redefin
 - `workflow_name`: identifies the deployed workflow variant; used for validation and routing at the web edge
 - `version`: version of the message contract
 - `run_id`: identifies a user-visible run
-- `graph_id`: identifies the orchestration graph managed by Exorcist
+- `graph_id`: identifies the orchestration graph managed by Exorcist and is the run locator carried by orchestration/task messages
 - `task_id`: identifies a task within a graph
 - `task_type`: dispatch key for worker routing
 - URL maps: string-to-URL mappings used for output discovery and worker input/output locations
@@ -69,7 +69,7 @@ The Terraform module boundaries should stay aligned with the architecture docume
 
 - Exclude all OpenFold/OpenFE-specific task types, metadata schemas, and workflow graphs from this plan.
 - Use one shared task SNS topic in v1, with downstream routing handled by queue subscriptions and filtering.
-- Keep `graph_id` distinct from `run_id` in the reusable contract, even if some initial workflows map them 1:1.
+- Carry `InputsMessage.run_id` into orchestration and task messages as `graph_id`, and treat `graph_id` as the authoritative run locator in the orchestration layer.
 - Use native `terraform test` for Terraform integration tests.
 - Run Terraform integration tests against a real AWS sandbox account, not a local emulator.
 - Python work should use `pytest` through the repo's `pixi` dev environment.
@@ -367,7 +367,7 @@ That keeps the website-facing code generic while still allowing each workflow to
 - [ ] Implement reusable request parsing around `InputsMessage`.
 - [ ] Validate the caller-provided `run_id` from `InputsMessage` and apply any output-location conventions used by the platform.
 - [ ] Implement construction of `OutputsMessage`, including output URL mappings and polling guidance.
-- [ ] Implement publishing of the initial orchestration message to the orchestration queue.
+- [ ] Implement publishing of the initial orchestration message to the orchestration queue, carrying `InputsMessage.run_id` as `OrchestrationMessage.graph_id`.
 - [ ] Define an adapter or protocol for workflow-specific graph construction.
 - [ ] Add a minimal generic example adapter used only for tests.
 - [ ] Keep all OpenFold/OpenFE-specific graph logic out of the reusable scaffold.

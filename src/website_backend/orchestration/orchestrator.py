@@ -1,5 +1,6 @@
 import logging
 from contextlib import contextmanager
+from pathlib import Path
 
 from website_backend.messages.task import TaskMessage
 
@@ -14,7 +15,7 @@ class Orchestrator:
         self.task_queue = task_queue
 
     @contextmanager
-    def taskdb(self, metadata):
+    def taskdb(self, graph_id):
         raise NotImplementedError()
 
     def process(self):
@@ -25,7 +26,7 @@ class Orchestrator:
             return None
 
         tasks = []
-        with self.taskdb(metadata) as taskdb:
+        with self.taskdb(msg.graph_id) as taskdb:
             msg.process(taskdb)
             while task_id := taskdb.check_out_task():
                 _logger.debug("Checked out task %s", task_id)
@@ -53,8 +54,12 @@ class Orchestrator:
 
 class LocalOrchestrator(Orchestrator):
     @contextmanager
-    def taskdb(self, metadata):
-        taskdb_file = metadata["taskdb"]
+    def taskdb(self, graph_id):
+        taskdb_file = Path(graph_id)
+        if not taskdb_file.is_absolute():
+            raise ValueError(
+                "LocalOrchestrator graph_id must be an absolute SQLite filename"
+            )
         _logger.debug("Using %s as task status DB", taskdb_file)
         taskdb = TaskStatusDB.from_filename(taskdb_file)
         yield taskdb
