@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from website_backend.messages import (
+    CURRENT_CONTRACT_VERSION,
     TaskMessage,
     dump_message,
     dump_message_json,
@@ -23,7 +24,7 @@ def test_task_message_accepts_opaque_nested_details_and_round_trips() -> None:
     }
     message = validate_task_message(
         {
-            "version": "2026-05",
+            "version": CURRENT_CONTRACT_VERSION,
             "task_type": "openfe_ligand_network",
             "task_id": "task-2",
             "attempt": 1,
@@ -34,7 +35,7 @@ def test_task_message_accepts_opaque_nested_details_and_round_trips() -> None:
 
     assert message.task_details == nested_details
     assert dump_message(message) == {
-        "version": "2026-05",
+        "version": CURRENT_CONTRACT_VERSION,
         "task_type": "openfe_ligand_network",
         "task_id": "task-2",
         "attempt": 1,
@@ -48,7 +49,7 @@ def test_task_message_rejects_non_positive_attempt() -> None:
     with pytest.raises(ValidationError):
         validate_task_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "task_type": "openfe_ligand_network",
                 "task_id": "task-2",
                 "attempt": 0,
@@ -62,7 +63,7 @@ def test_task_message_rejects_extra_top_level_fields() -> None:
     with pytest.raises(ValidationError):
         validate_task_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "task_type": "openfe_ligand_network",
                 "task_id": "task-2",
                 "attempt": 1,

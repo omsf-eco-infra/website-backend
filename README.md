@@ -32,15 +32,14 @@ Rules:
 
 ### Orchestrator Lambda
 
-- `CONTRACT_VERSION`
 - `WORKFLOW_NAME`
+- `ORCHESTRATION_QUEUE_URL`
 - `STATE_BUCKET`
 - `STATE_PREFIX`
 - `TASK_TOPIC_ARN`
 
 ### Web-interface Lambda
 
-- `CONTRACT_VERSION`
 - `WORKFLOW_NAME`
 - `ORCHESTRATION_QUEUE_URL`
 - `INPUTS_BUCKET`
@@ -48,7 +47,6 @@ Rules:
 
 ### Fargate-launcher Lambda
 
-- `CONTRACT_VERSION`
 - `WORKFLOW_NAME`
 - `ECS_CLUSTER_ARN`
 - `ECS_TASK_DEFINITION_ARN`

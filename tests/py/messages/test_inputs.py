@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from website_backend.messages import (
+    CURRENT_CONTRACT_VERSION,
     InputsMessage,
     dump_message,
     dump_message_json,
@@ -22,7 +23,7 @@ def test_inputs_message_parses_opaque_nested_details() -> None:
     }
     message = validate_inputs_message(
         {
-            "version": "2026-05",
+            "version": CURRENT_CONTRACT_VERSION,
             "workflow_name": "example-workflow",
             "run_id": "run-123",
             "details": nested_details,
@@ -32,7 +33,7 @@ def test_inputs_message_parses_opaque_nested_details() -> None:
     assert isinstance(message, InputsMessage)
     assert message.details == nested_details
     assert dump_message(message) == {
-        "version": "2026-05",
+        "version": CURRENT_CONTRACT_VERSION,
         "workflow_name": "example-workflow",
         "run_id": "run-123",
         "details": nested_details,
@@ -44,7 +45,7 @@ def test_inputs_message_rejects_missing_required_fields() -> None:
     with pytest.raises(ValidationError):
         validate_inputs_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "details": {},
             }
         )
@@ -54,7 +55,7 @@ def test_inputs_message_rejects_extra_top_level_fields() -> None:
     with pytest.raises(ValidationError):
         validate_inputs_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "workflow_name": "example-workflow",
                 "run_id": "run-123",
                 "details": {},

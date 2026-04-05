@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import pytest
 import sqlalchemy as sqla
 
+from website_backend.messages import CURRENT_CONTRACT_VERSION
 from website_backend.orchestration.orchestrator import LocalOrchestrator, Orchestrator
 from website_backend.orchestration.taskdb import TaskStatusDB
 
@@ -54,12 +55,39 @@ class TestOrchestrator:
         assert len(orchestration_queue.completed_deliveries) == 1
 
         task_message = task_queue.messages[0]
-        assert task_message.version == "2026-05"
+        assert task_message.version == CURRENT_CONTRACT_VERSION
         assert task_message.graph_id == "run-123"
         assert task_message.task_id == "task-1"
         assert task_message.task_type == "openfold_predict"
         assert task_message.attempt == 1
         assert task_message.task_details == {"protein": "AAA"}
+
+    def test_rejects_message_with_unsupported_contract_version(self) -> None:
+        orchestration_queue = self.support.orchestration_queue(
+            [
+                self.support.add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "task_type": "prepare_inputs",
+                            "details": {"step": 1},
+                        }
+                    ],
+                    version="1776.07",
+                )
+            ]
+        )
+        task_queue = self.support.task_queue()
+
+        orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
+
+        with pytest.raises(ValueError, match="current contract version"):
+            orchestrator.process()
+
+        assert task_queue.messages == []
+        assert orchestration_queue.completed_deliveries == []
 
     def test_only_dispatches_newly_unblocked_tasks(self) -> None:
         orchestration_queue = self.support.orchestration_queue(

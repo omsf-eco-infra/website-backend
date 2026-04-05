@@ -5,6 +5,7 @@ import json
 import boto3
 from moto import mock_aws
 
+from website_backend.messages import CURRENT_CONTRACT_VERSION
 from website_backend.messages import dump_message_json
 from website_backend.messages import validate_orchestration_message
 from website_backend.messages import validate_task_message
@@ -49,7 +50,7 @@ class TestSQSQueue:
         assert messages[0]["Body"] == dump_message_json(task_message)
         assert messages[0]["MessageAttributes"] == {
             "task_type": {"DataType": "String", "StringValue": "prepare_inputs"},
-            "version": {"DataType": "String", "StringValue": "2026-05"},
+            "version": {"DataType": "String", "StringValue": CURRENT_CONTRACT_VERSION},
             "workflow_name": {
                 "DataType": "String",
                 "StringValue": "example-workflow",

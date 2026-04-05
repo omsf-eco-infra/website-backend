@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from website_backend.messages import CURRENT_CONTRACT_VERSION
 from website_backend.messages import validate_inputs_message
 from website_backend.messages import validate_orchestration_message
 from website_backend.messages import validate_task_message
@@ -11,7 +12,7 @@ from website_backend.messages import validate_task_message
 def task_message():
     return validate_task_message(
         {
-            "version": "2026-05",
+            "version": CURRENT_CONTRACT_VERSION,
             "task_type": "prepare_inputs",
             "task_id": "task-1",
             "attempt": 1,
@@ -25,7 +26,7 @@ def task_message():
 def orchestration_message():
     return validate_orchestration_message(
         {
-            "version": "2026-05",
+            "version": CURRENT_CONTRACT_VERSION,
             "graph_id": "run-123",
             "message_type": "ADD_TASKS",
             "details": {
@@ -46,7 +47,7 @@ def orchestration_message():
 def inputs_message():
     return validate_inputs_message(
         {
-            "version": "2026-05",
+            "version": CURRENT_CONTRACT_VERSION,
             "workflow_name": "example-workflow",
             "run_id": "run-123",
             "details": {},

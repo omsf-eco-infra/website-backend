@@ -136,7 +136,7 @@ This phase should also define how repo-level tooling supports both Python unit t
 - Runtime configuration:
   - deployment-specific values are injected per Lambda function or per ECS task definition, not at image build time
   - document only the environment variables a given runtime consumes; do not define one global superset that every runtime receives
-  - use descriptive resource-oriented names without a repo prefix, such as `CONTRACT_VERSION`, `WORKFLOW_NAME`, `STATE_BUCKET`, `STATE_PREFIX`, `TASK_TOPIC_ARN`, `ORCHESTRATION_QUEUE_URL`, `INPUTS_BUCKET`, `OUTPUTS_BUCKET`, `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `SUBNET_IDS`, and `SECURITY_GROUP_IDS`
+  - use descriptive resource-oriented names without a repo prefix, such as `WORKFLOW_NAME`, `STATE_BUCKET`, `STATE_PREFIX`, `TASK_TOPIC_ARN`, `ORCHESTRATION_QUEUE_URL`, `INPUTS_BUCKET`, `OUTPUTS_BUCKET`, `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `SUBNET_IDS`, and `SECURITY_GROUP_IDS`
   - keep secrets out of this shared contract; later phases should use AWS secret-management mechanisms if they introduce secrets
 - OpenTofu helper harness:
   - infra tests run as `pixi run -e dev tofu -chdir=tests/tf/<module-name> test -test-directory=.`

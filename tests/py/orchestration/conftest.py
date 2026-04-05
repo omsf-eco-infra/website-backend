@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from website_backend.messages import CURRENT_CONTRACT_VERSION
 from website_backend.messages.orchestration import validate_orchestration_message
 from website_backend.orchestration.taskdb import TaskStatusDB
 from website_backend.queues import QueueDelivery
@@ -46,30 +47,39 @@ class OrchestrationTestSupport:
     def task_queue(self) -> StubTaskQueue:
         return StubTaskQueue()
 
-    def add_tasks_message(self, graph_id, tasks):
+    def add_tasks_message(self, graph_id, tasks, *, version=CURRENT_CONTRACT_VERSION):
         return validate_orchestration_message(
             {
-                "version": "2026-05",
+                "version": version,
                 "graph_id": graph_id,
                 "message_type": "ADD_TASKS",
                 "details": {"tasks": tasks},
             }
         )
 
-    def task_completed_message(self, graph_id, task_id):
+    def task_completed_message(
+        self, graph_id, task_id, *, version=CURRENT_CONTRACT_VERSION
+    ):
         return validate_orchestration_message(
             {
-                "version": "2026-05",
+                "version": version,
                 "graph_id": graph_id,
                 "message_type": "TASK_COMPLETED",
                 "details": {"task_id": task_id},
             }
         )
 
-    def task_error_message(self, graph_id, task_id, error_msg="boom"):
+    def task_error_message(
+        self,
+        graph_id,
+        task_id,
+        error_msg="boom",
+        *,
+        version=CURRENT_CONTRACT_VERSION,
+    ):
         return validate_orchestration_message(
             {
-                "version": "2026-05",
+                "version": version,
                 "graph_id": graph_id,
                 "message_type": "TASK_ERROR",
                 "details": {"task_id": task_id, "error_msg": error_msg},

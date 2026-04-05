@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Iterator
 
 from website_backend.messages.common import GraphId
+from website_backend.messages.common import CURRENT_CONTRACT_VERSION
+from website_backend.messages.common import validate_contract_version
 from website_backend.messages.orchestration import OrchestrationMessage
 from website_backend.messages.task import TaskMessage
 from website_backend.queues import InputQueue, OutputQueue
@@ -36,6 +38,7 @@ class Orchestrator:
         if delivery is None:
             return None
         msg = delivery.message
+        validate_contract_version(msg.version)
 
         tasks: list[TaskMessage] = []
         with self.taskdb(msg.graph_id) as taskdb:
@@ -44,7 +47,7 @@ class Orchestrator:
                 _logger.debug("Checked out task %s", task_id)
                 tasks.append(
                     TaskMessage(
-                        version=msg.version,
+                        version=CURRENT_CONTRACT_VERSION,
                         task_type=taskdb.get_task_type(task_id),
                         task_id=task_id,
                         attempt=taskdb.get_task_attempt(task_id),

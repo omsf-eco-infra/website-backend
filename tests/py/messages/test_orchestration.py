@@ -6,7 +6,11 @@ import pytest
 import sqlalchemy as sqla
 from pydantic import ValidationError
 
-from website_backend.messages import dump_message, dump_message_json
+from website_backend.messages import (
+    CURRENT_CONTRACT_VERSION,
+    dump_message,
+    dump_message_json,
+)
 from website_backend.messages.orchestration import (
     AddTasksMessage,
     OrchestrationMessage,
@@ -34,7 +38,7 @@ class TestAddTasksMessage:
         }
         message = validate_orchestration_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "graph_id": "run-123",
                 "message_type": "ADD_TASKS",
                 "details": {
@@ -55,7 +59,7 @@ class TestAddTasksMessage:
         assert message.details.tasks[0].max_tries == 1
         assert message.details.tasks[0].details == nested_details
         assert dump_message(message) == {
-            "version": "2026-05",
+            "version": CURRENT_CONTRACT_VERSION,
             "graph_id": "run-123",
             "message_type": "ADD_TASKS",
             "details": {
@@ -75,7 +79,7 @@ class TestAddTasksMessage:
     def test_accepts_explicit_max_tries(self) -> None:
         message = validate_orchestration_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "graph_id": "run-123",
                 "message_type": "ADD_TASKS",
                 "details": {
@@ -98,7 +102,7 @@ class TestAddTasksMessage:
     def test_processes_tasks_into_taskdb(self) -> None:
         message = validate_orchestration_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "graph_id": "run-123",
                 "message_type": "ADD_TASKS",
                 "details": {
@@ -142,7 +146,7 @@ class TestTaskCompletedMessage:
     def test_processes_into_taskdb(self) -> None:
         message = validate_orchestration_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "graph_id": "run-123",
                 "message_type": "TASK_COMPLETED",
                 "details": {"task_id": "task-2"},
@@ -179,7 +183,7 @@ class TestTaskErrorMessage:
     def test_processes_into_taskdb(self) -> None:
         message = validate_orchestration_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "graph_id": "run-123",
                 "message_type": "TASK_ERROR",
                 "details": {"task_id": "task-3", "error_msg": "task failed"},
@@ -210,7 +214,7 @@ class TestOrchestrationMessage:
         [
             (
                 {
-                    "version": "2026-05",
+                    "version": CURRENT_CONTRACT_VERSION,
                     "graph_id": "run-123",
                     "message_type": "TASK_COMPLETED",
                     "details": {"task_id": "task-2"},
@@ -219,7 +223,7 @@ class TestOrchestrationMessage:
             ),
             (
                 {
-                    "version": "2026-05",
+                    "version": CURRENT_CONTRACT_VERSION,
                     "graph_id": "run-123",
                     "message_type": "TASK_ERROR",
                     "details": {"task_id": "task-3", "error_msg": "task failed"},
@@ -240,7 +244,7 @@ class TestOrchestrationMessage:
         with pytest.raises(ValidationError):
             validate_orchestration_message(
                 {
-                    "version": "2026-05",
+                    "version": CURRENT_CONTRACT_VERSION,
                     "graph_id": "run-123",
                     "message_type": "NOT_A_REAL_TYPE",
                     "details": {},
@@ -251,7 +255,7 @@ class TestOrchestrationMessage:
         with pytest.raises(ValidationError):
             validate_orchestration_message(
                 {
-                    "version": "2026-05",
+                    "version": CURRENT_CONTRACT_VERSION,
                     "graph_id": "run-123",
                     "message_type": "TASK_COMPLETED",
                     "details": {},
@@ -262,7 +266,7 @@ class TestOrchestrationMessage:
         with pytest.raises(ValidationError):
             validate_orchestration_message(
                 {
-                    "version": "2026-05",
+                    "version": CURRENT_CONTRACT_VERSION,
                     "graph_id": "run-123",
                     "message_type": "TASK_ERROR",
                     "details": {"task_id": "task-3", "error_msg": "task failed"},
@@ -274,7 +278,7 @@ class TestOrchestrationMessage:
         with pytest.raises(ValidationError):
             validate_orchestration_message(
                 {
-                    "version": "2026-05",
+                    "version": CURRENT_CONTRACT_VERSION,
                     "graph_id": "run-123",
                     "run_id": "run-123",
                     "message_type": "TASK_COMPLETED",
