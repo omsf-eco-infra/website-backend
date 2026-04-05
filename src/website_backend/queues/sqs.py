@@ -13,6 +13,65 @@ MessageT = TypeVar("MessageT")
 MessageAttributes = Mapping[str, Mapping[str, Any]]
 
 
+def decode_sqs_delivery(
+    message: Mapping[str, Any],
+    *,
+    message_decoder: Callable[[Any], MessageT],
+    body_field: str = "Body",
+    ack_token_field: str = "ReceiptHandle",
+    message_id_field: str = "MessageId",
+    attributes_field: str = "Attributes",
+    message_attributes_field: str = "MessageAttributes",
+) -> QueueDelivery[MessageT]:
+    """Decode one SQS delivery using the provided transport field names."""
+
+    raw_body = message[body_field]
+    parsed_body = json.loads(raw_body)
+    decoded_message = message_decoder(parsed_body)
+
+    return QueueDelivery(
+        message=decoded_message,
+        ack_token=message[ack_token_field],
+        message_id=message.get(message_id_field),
+        attributes=message.get(attributes_field, {}),
+        message_attributes=message.get(message_attributes_field, {}),
+        raw_body=raw_body,
+    )
+
+
+class LambdaEventQueue(InputQueue[MessageT]):
+    """Single-delivery queue backed by one SQS-triggered Lambda event record."""
+
+    def __init__(
+        self,
+        *,
+        event: Mapping[str, Any],
+        message_decoder: Callable[[Any], MessageT],
+    ) -> None:
+        records = event.get("Records", [])
+        if len(records) != 1:
+            raise ValueError(
+                "Expected exactly one SQS record from the orchestration queue trigger"
+            )
+        self._delivery = decode_sqs_delivery(
+            records[0],
+            message_decoder=message_decoder,
+            body_field="body",
+            ack_token_field="receiptHandle",
+            message_id_field="messageId",
+            attributes_field="attributes",
+            message_attributes_field="messageAttributes",
+        )
+
+    def get_message(self) -> QueueDelivery[MessageT] | None:
+        delivery = self._delivery
+        self._delivery = None
+        return delivery
+
+    def mark_message_completed(self, delivery: QueueDelivery[MessageT]) -> None:
+        del delivery
+
+
 class SQSQueue(InputQueue[MessageT], OutputQueue[MessageT]):
     """SQS-backed queue adapter for canonical project message payloads.
 
@@ -112,18 +171,9 @@ class SQSQueue(InputQueue[MessageT], OutputQueue[MessageT]):
         if not messages:
             return None
 
-        message = messages[0]
-        raw_body = message["Body"]
-        parsed_body = json.loads(raw_body)
-        decoded_message = self.message_decoder(parsed_body)
-
-        return QueueDelivery(
-            message=decoded_message,
-            ack_token=message["ReceiptHandle"],
-            message_id=message.get("MessageId"),
-            attributes=message.get("Attributes", {}),
-            message_attributes=message.get("MessageAttributes", {}),
-            raw_body=raw_body,
+        return decode_sqs_delivery(
+            messages[0],
+            message_decoder=self.message_decoder,
         )
 
     def mark_message_completed(self, delivery: QueueDelivery[MessageT]) -> None:

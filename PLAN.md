@@ -216,14 +216,14 @@ To stay reusable, the Lambda should depend on clear adapters for persistence, Ex
 ### Checklist
 
 - [x] Define adapter boundaries for graph persistence, task dispatch, and Exorcist-backed state operations.
-- [ ] Implement the Lambda handler entrypoint and event decoding for orchestration queue messages.
+- [x] Implement the Lambda handler entrypoint and event decoding for orchestration queue messages.
 - [x] Implement `ADD_TASKS` handling that inserts tasks and immediately dispatches newly runnable work.
 - [x] Implement `TASK_COMPLETED` handling that marks completion and dispatches newly unblocked tasks in the local/reference runtime.
 - [x] Implement retryable `TASK_ERROR` handling that increments attempts and redispatches work while retries remain.
 - [x] Define terminal-error behavior for `TASK_ERROR` events once `max_tries` is exhausted.
-- [ ] Persist graph state to S3 after each accepted mutation.
-- [x] Define unknown-task behavior: log and acknowledge invalid completion/error events as no-ops at the orchestrator boundary.
-- [x] Define explicit behavior for duplicate `ADD_TASKS`, duplicate `TASK_COMPLETED`, duplicate `TASK_ERROR`, and other stale/no-op events in terms of Exorcist's current semantics.
+- [x] Persist graph state to S3 after each accepted mutation.
+- [ ] Define unknown-task behavior: log and acknowledge invalid completion/error events as no-ops at the orchestrator boundary.
+- [ ] Define explicit behavior for duplicate `ADD_TASKS`, duplicate `TASK_COMPLETED`, duplicate `TASK_ERROR`, and other stale/no-op events in terms of Exorcist's current semantics.
 - [x] Ensure emitted `TaskMessage` payloads come from the shared Phase 1 message contracts.
 - [x] Keep task-type routing generic and driven by message content plus dispatch configuration.
 
@@ -235,8 +235,9 @@ The repo now contains a reusable local/reference orchestrator that already prove
 - runnable work is emitted as `TaskMessage` payloads populated from taskdb state, including `task_type`, `task_details`, `graph_id`, and `attempt`
 - graph state is isolated by `graph_id`, and the current local backend reopens the same SQLite file or in-memory engine for subsequent events targeting that graph
 - Exorcist already treats retry exhaustion as a terminal `TOO_MANY_RETRIES` state rather than redispatching further work
-- duplicate-event handling is now defined at the orchestrator boundary: duplicate `ADD_TASKS` remains invalid, duplicate `TASK_COMPLETED` is accepted as a no-op, and stale/duplicate `TASK_ERROR` events are logged and acknowledged as no-ops
-- reusable queue adapters exist for in-memory tests plus AWS SNS/SQS transports, so the remaining Phase 2 work is primarily Lambda/S3 wiring and edge-case policy definition
+- duplicate `ADD_TASKS` remains invalid, duplicate `TASK_COMPLETED` is accepted as a no-op, and terminal retry exhaustion is covered; however, stale/unknown `TASK_ERROR` no-op handling is still blocked by an upstream Exorcist bug
+- reusable queue adapters exist for in-memory tests plus AWS SNS/SQS transports, and the Phase 2 Lambda path now decodes orchestration SQS event records directly while preserving the shared per-message orchestrator core
+- known upstream blocker: Exorcist's failure-transition path raises `NameError` on zero-row updates, so unknown or stale duplicate `TASK_ERROR` notifications do not yet cleanly ack as no-ops
 
 ### Definition of Done
 

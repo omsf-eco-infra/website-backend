@@ -227,6 +227,178 @@ class TestOrchestrator:
         assert task_queue.messages[1].attempt == 2
         assert len(orchestration_queue.completed_deliveries) == 2
 
+    def test_duplicate_add_tasks_is_invalid_and_not_acked(self) -> None:
+        orchestration_queue = self.support.orchestration_queue(
+            [
+                self.support.add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "task_type": "prepare_inputs",
+                            "details": {"step": 1},
+                        }
+                    ],
+                ),
+                self.support.add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "task_type": "prepare_inputs",
+                            "details": {"step": 1},
+                        }
+                    ],
+                ),
+            ]
+        )
+        task_queue = self.support.task_queue()
+
+        orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
+
+        assert orchestrator.process() is True
+
+        with pytest.raises(sqla.exc.IntegrityError):
+            orchestrator.process()
+
+        assert [message.task_id for message in task_queue.messages] == ["task-1"]
+        assert len(orchestration_queue.completed_deliveries) == 1
+
+    def test_duplicate_task_completed_is_acked_as_no_op(self) -> None:
+        orchestration_queue = self.support.orchestration_queue(
+            [
+                self.support.add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "task_type": "prepare_inputs",
+                            "details": {"step": 1},
+                        }
+                    ],
+                ),
+                self.support.task_completed_message("run-123", "task-1"),
+                self.support.task_completed_message("run-123", "task-1"),
+            ]
+        )
+        task_queue = self.support.task_queue()
+
+        orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
+
+        assert orchestrator.process() is True
+        assert orchestrator.process() is True
+        assert orchestrator.process() is True
+
+        assert [message.task_id for message in task_queue.messages] == ["task-1"]
+        assert len(orchestration_queue.completed_deliveries) == 3
+
+    def test_unknown_task_completed_is_acked_as_no_op(self) -> None:
+        orchestration_queue = self.support.orchestration_queue(
+            [
+                self.support.task_completed_message("run-123", "missing-task"),
+            ]
+        )
+        task_queue = self.support.task_queue()
+
+        orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
+
+        assert orchestrator.process() is True
+
+        assert task_queue.messages == []
+        assert len(orchestration_queue.completed_deliveries) == 1
+
+    @pytest.mark.xfail(
+        raises=NameError,
+        reason=(
+            "Upstream exorcist.TaskStatusDB failure transitions raise NameError "
+            "instead of treating zero-row TASK_ERROR updates as stale/unknown no-ops"
+        ),
+        strict=True,
+    )
+    def test_unknown_task_error_should_be_acked_as_no_op(self) -> None:
+        orchestration_queue = self.support.orchestration_queue(
+            [
+                self.support.task_error_message("run-123", "missing-task"),
+            ]
+        )
+        task_queue = self.support.task_queue()
+
+        orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
+
+        assert orchestrator.process() is True
+
+        assert task_queue.messages == []
+        assert len(orchestration_queue.completed_deliveries) == 1
+
+    def test_retry_exhaustion_does_not_redispatch_task(self) -> None:
+        orchestration_queue = self.support.orchestration_queue(
+            [
+                self.support.add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "max_tries": 1,
+                            "task_type": "run_model",
+                            "details": {"step": 1},
+                        }
+                    ],
+                ),
+                self.support.task_error_message("run-123", "task-1"),
+            ]
+        )
+        task_queue = self.support.task_queue()
+
+        orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
+
+        assert orchestrator.process() is True
+        assert orchestrator.process() is True
+
+        assert [message.task_id for message in task_queue.messages] == ["task-1"]
+        assert len(orchestration_queue.completed_deliveries) == 2
+
+    @pytest.mark.xfail(
+        raises=NameError,
+        reason=(
+            "Upstream exorcist.TaskStatusDB failure transitions raise NameError "
+            "for stale duplicate TASK_ERROR notifications after retry exhaustion"
+        ),
+        strict=True,
+    )
+    def test_stale_duplicate_task_error_is_acked_after_retry_exhaustion(self) -> None:
+        orchestration_queue = self.support.orchestration_queue(
+            [
+                self.support.add_tasks_message(
+                    "run-123",
+                    [
+                        {
+                            "task_id": "task-1",
+                            "requirements": [],
+                            "max_tries": 1,
+                            "task_type": "run_model",
+                            "details": {"step": 1},
+                        }
+                    ],
+                ),
+                self.support.task_error_message("run-123", "task-1"),
+                self.support.task_error_message("run-123", "task-1"),
+            ]
+        )
+        task_queue = self.support.task_queue()
+
+        orchestrator = InMemoryOrchestrator(orchestration_queue, task_queue)
+
+        assert orchestrator.process() is True
+        assert orchestrator.process() is True
+        assert orchestrator.process() is True
+
+        assert [message.task_id for message in task_queue.messages] == ["task-1"]
+        assert len(orchestration_queue.completed_deliveries) == 3
+
 
 class TestLocalOrchestrator:
     @pytest.fixture(autouse=True)

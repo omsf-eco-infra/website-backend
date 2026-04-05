@@ -33,7 +33,6 @@ Rules:
 ### Orchestrator Lambda
 
 - `WORKFLOW_NAME`
-- `ORCHESTRATION_QUEUE_URL`
 - `STATE_BUCKET`
 - `STATE_PREFIX`
 - `TASK_TOPIC_ARN`
