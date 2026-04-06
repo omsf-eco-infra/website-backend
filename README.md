@@ -102,10 +102,10 @@ This repo now carries two GitHub Actions workflows:
 - `Pytest`: runs the Python test suite on pull requests and pushes to `main`
 - `Terraform`: runs the local OpenTofu support smoke test on every pull request plus a real-AWS ci-smoke job for same-repo pull requests, pushes to `main`, and manual runs on `main`
 
-The AWS-backed workflow expects these repository variables:
+The AWS-backed workflow uses these repository variables:
 
 - `AWS_GHA_TEST_ROLE_ARN`
 - `AWS_REGION`
 
-Bootstrap the AWS-side role and OIDC provider from
+Bootstrap the AWS-side role, OIDC provider, and repository variables from
 `bootstrap/github-actions/`.

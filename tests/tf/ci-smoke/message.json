@@ -1,0 +1,7 @@
+{
+  "message_type": "ci-smoke",
+  "payload": {
+    "ok": true,
+    "source": "terraform-ci"
+  }
+}
