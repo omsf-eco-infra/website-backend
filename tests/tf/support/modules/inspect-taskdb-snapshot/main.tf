@@ -11,28 +11,17 @@ variable "python_executable" {
   default = "python"
 }
 
-variable "queue_url" {
+variable "bucket" {
   type = string
 }
 
-variable "min_message_count" {
-  type    = number
-  default = 1
+variable "key" {
+  type = string
 }
 
-variable "max_number_of_messages" {
-  type    = number
-  default = 10
-}
-
-variable "wait_time_seconds" {
-  type    = number
-  default = 5
-}
-
-variable "delete_after_read" {
-  type    = bool
-  default = false
+variable "previous_etag" {
+  type    = string
+  default = null
 }
 
 variable "timeout_seconds" {
@@ -50,22 +39,18 @@ locals {
     [
       var.python_executable,
       "-m",
-      "website_backend.testing.read_sqs_messages",
+      "website_backend.testing.inspect_taskdb_snapshot",
       "--external-output",
-      "--queue-url",
-      var.queue_url,
-      "--min-message-count",
-      tostring(var.min_message_count),
-      "--max-number-of-messages",
-      tostring(var.max_number_of_messages),
-      "--wait-time-seconds",
-      tostring(var.wait_time_seconds),
+      "--bucket",
+      var.bucket,
+      "--key",
+      var.key,
       "--timeout-seconds",
       tostring(var.timeout_seconds),
       "--poll-interval-seconds",
       tostring(var.poll_interval_seconds),
     ],
-    var.delete_after_read ? ["--delete-after-read"] : [],
+    var.previous_etag == null ? [] : ["--previous-etag", var.previous_etag],
   )
 }
 

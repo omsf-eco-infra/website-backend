@@ -26,6 +26,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-message-count", type=int, default=1)
     parser.add_argument("--max-number-of-messages", type=int, default=10)
     parser.add_argument("--wait-time-seconds", type=int, default=5)
+    parser.add_argument(
+        "--delete-after-read",
+        action="store_true",
+        help="Delete the collected messages after reading them.",
+    )
     add_polling_args(parser)
     add_external_output_flag(parser)
     return parser
@@ -61,6 +66,7 @@ def read_messages(
     min_message_count: int = 1,
     max_number_of_messages: int = 10,
     wait_time_seconds: int = 5,
+    delete_after_read: bool = False,
     timeout_seconds: int = 180,
     poll_interval_seconds: int = 5,
     client: Any | None = None,
@@ -79,6 +85,8 @@ def read_messages(
         Maximum number of messages to request per receive call.
     wait_time_seconds : int, default=5
         SQS long-poll duration for each receive call.
+    delete_after_read : bool, default=False
+        Whether to delete the collected messages after reading them.
     timeout_seconds : int, default=180
         Maximum total time to wait for messages.
     poll_interval_seconds : int, default=5
@@ -119,6 +127,15 @@ def read_messages(
 
         sleeper(poll_interval_seconds)
 
+    if delete_after_read:
+        for message in messages_by_id.values():
+            receipt_handle = message.get("ReceiptHandle")
+            if receipt_handle:
+                sqs_client.delete_message(
+                    QueueUrl=queue_url,
+                    ReceiptHandle=receipt_handle,
+                )
+
     return {
         "message_count": len(messages_by_id),
         "messages": list(messages_by_id.values()),
@@ -144,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
         min_message_count=args.min_message_count,
         max_number_of_messages=args.max_number_of_messages,
         wait_time_seconds=args.wait_time_seconds,
+        delete_after_read=args.delete_after_read,
         timeout_seconds=args.timeout_seconds,
         poll_interval_seconds=args.poll_interval_seconds,
     )
