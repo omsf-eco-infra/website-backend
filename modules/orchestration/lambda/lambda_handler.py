@@ -32,6 +32,7 @@ def s3_sqlite_handler(event: dict[str, Any], context: Any) -> bool:
     task_queue = SNSQueue(
         topic_arn=topic_arn,
         message_encoder=dump_message_json,
+        message_group_id_getter=lambda message: message.graph_id,
     )
     orchestrator = S3SQLiteOrchestrator(
         orchestration_queue,
