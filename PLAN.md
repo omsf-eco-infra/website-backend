@@ -156,13 +156,13 @@ That split matters because the envelopes are infrastructure contracts, while the
 
 ### Checklist
 
-- [ ] Expand the existing Pydantic models to cover `InputsMessage` and `OutputsMessage` in addition to the current orchestration and task messages.
-- [ ] Centralize shared constrained types, strict base-model behavior, and reusable serialization helpers.
-- [ ] Preserve discriminated orchestration parsing for `ADD_TASKS`, `TASK_COMPLETED`, and `TASK_ERROR`.
-- [ ] Standardize field naming and version handling across all message families.
-- [ ] Add helper functions for validation and round-trip serialization that Lambda handlers and tests can reuse.
-- [ ] Keep workflow-specific `details` values opaque and do not introduce OpenFold/OpenFE-specific nested models.
-- [ ] Document the intended ownership of each message family so later phases use them consistently.
+- [x] Expand the existing Pydantic models to cover `InputsMessage` and `OutputsMessage` in addition to the current orchestration and task messages.
+- [x] Centralize shared constrained types, strict base-model behavior, and reusable serialization helpers.
+- [x] Preserve discriminated orchestration parsing for `ADD_TASKS`, `TASK_COMPLETED`, and `TASK_ERROR`.
+- [x] Standardize field naming and version handling across all message families.
+- [x] Add helper functions for validation and round-trip serialization that Lambda handlers and tests can reuse.
+- [x] Keep workflow-specific `details` values opaque and do not introduce OpenFold/OpenFE-specific nested models.
+- [x] Document the intended ownership of each message family so later phases use them consistently.
 
 ### Definition of Done
 
@@ -365,7 +365,7 @@ That keeps the website-facing code generic while still allowing each workflow to
 ### Checklist
 
 - [ ] Implement reusable request parsing around `InputsMessage`.
-- [ ] Implement generation of `run_id` and any output-location conventions used by the platform.
+- [ ] Validate the caller-provided `run_id` from `InputsMessage` and apply any output-location conventions used by the platform.
 - [ ] Implement construction of `OutputsMessage`, including output URL mappings and polling guidance.
 - [ ] Implement publishing of the initial orchestration message to the orchestration queue.
 - [ ] Define an adapter or protocol for workflow-specific graph construction.
