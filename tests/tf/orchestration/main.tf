@@ -161,33 +161,6 @@ resource "aws_sns_topic_subscription" "observer" {
   depends_on = [aws_sqs_queue_policy.observer]
 }
 
-module "add_tasks_payload_file" {
-  source = "../support/modules/write-json-artifact"
-
-  artifacts_root = local.artifacts_root
-  test_name      = local.test_name
-  artifact_name  = "add-tasks-payload"
-  content_json   = jsonencode(local.add_tasks_payload)
-}
-
-module "task_a_completed_payload_file" {
-  source = "../support/modules/write-json-artifact"
-
-  artifacts_root = local.artifacts_root
-  test_name      = local.test_name
-  artifact_name  = "task-a-completed-payload"
-  content_json   = jsonencode(local.task_a_completed_payload)
-}
-
-module "task_b_completed_payload_file" {
-  source = "../support/modules/write-json-artifact"
-
-  artifacts_root = local.artifacts_root
-  test_name      = local.test_name
-  artifact_name  = "task-b-completed-payload"
-  content_json   = jsonencode(local.task_b_completed_payload)
-}
-
 module "publish_add_tasks" {
   source = "../support/modules/publish-sqs-message"
 
@@ -195,13 +168,12 @@ module "publish_add_tasks" {
   test_name                = local.test_name
   artifact_name            = "publish-add-tasks"
   queue_url                = module.module_under_test.orchestration_queue_url
-  payload_file             = module.add_tasks_payload_file.artifact_path
+  payload                  = jsonencode(local.add_tasks_payload)
   message_group_id         = local.graph_id
   message_deduplication_id = "${local.run_id}-add-tasks"
 
   depends_on = [
     aws_sns_topic_subscription.observer,
-    module.add_tasks_payload_file,
     module.module_under_test,
   ]
 }
@@ -247,13 +219,12 @@ module "publish_task_a_completed" {
   test_name                = local.test_name
   artifact_name            = "publish-task-a-completed"
   queue_url                = module.module_under_test.orchestration_queue_url
-  payload_file             = module.task_a_completed_payload_file.artifact_path
+  payload                  = jsonencode(local.task_a_completed_payload)
   message_group_id         = local.graph_id
   message_deduplication_id = "${local.run_id}-task-a-completed"
 
   depends_on = [
     module.check_empty_after_initial_fanout,
-    module.task_a_completed_payload_file,
   ]
 }
 
@@ -287,13 +258,12 @@ module "publish_task_b_completed" {
   test_name                = local.test_name
   artifact_name            = "publish-task-b-completed"
   queue_url                = module.module_under_test.orchestration_queue_url
-  payload_file             = module.task_b_completed_payload_file.artifact_path
+  payload                  = jsonencode(local.task_b_completed_payload)
   message_group_id         = local.graph_id
   message_deduplication_id = "${local.run_id}-task-b-completed"
 
   depends_on = [
     module.check_empty_after_task_a,
-    module.task_b_completed_payload_file,
   ]
 }
 

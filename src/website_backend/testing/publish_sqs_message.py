@@ -22,7 +22,9 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(description="Publish a message to SQS.")
     parser.add_argument("--queue-url", required=True)
-    parser.add_argument("--payload-file", required=True)
+    payload_group = parser.add_mutually_exclusive_group(required=True)
+    payload_group.add_argument("--payload-file")
+    payload_group.add_argument("--payload")
     parser.add_argument("--message-group-id")
     parser.add_argument("--message-deduplication-id")
     add_external_output_flag(parser)
@@ -32,7 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
 def publish_message(
     *,
     queue_url: str,
-    payload_file: str,
+    payload_file: str | None = None,
+    payload: str | None = None,
     message_group_id: str | None = None,
     message_deduplication_id: str | None = None,
     client: Any | None = None,
@@ -43,8 +46,10 @@ def publish_message(
     ----------
     queue_url : str
         URL of the target SQS queue.
-    payload_file : str
+    payload_file : str or None, default=None
         Path to the message payload file.
+    payload : str or None, default=None
+        Inline message payload text.
     message_group_id : str or None, default=None
         FIFO queue message group identifier.
     message_deduplication_id : str or None, default=None
@@ -57,11 +62,13 @@ def publish_message(
     dict[str, Any]
         Send result summary containing message identifiers returned by SQS.
     """
+    if (payload_file is None) == (payload is None):
+        raise ValueError("Exactly one of payload_file or payload must be provided.")
+
     sqs_client = client or boto3.client("sqs")
-    payload = load_text(payload_file)
     request: dict[str, Any] = {
         "QueueUrl": queue_url,
-        "MessageBody": payload,
+        "MessageBody": payload if payload is not None else load_text(payload_file),
     }
     if message_group_id is not None:
         request["MessageGroupId"] = message_group_id
@@ -95,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     result = publish_message(
         queue_url=args.queue_url,
         payload_file=args.payload_file,
+        payload=args.payload,
         message_group_id=args.message_group_id,
         message_deduplication_id=args.message_deduplication_id,
     )

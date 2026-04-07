@@ -29,7 +29,13 @@ variable "queue_url" {
 }
 
 variable "payload_file" {
-  type = string
+  type    = string
+  default = null
+}
+
+variable "payload" {
+  type    = string
+  default = null
 }
 
 variable "message_group_id" {
@@ -44,15 +50,23 @@ variable "message_deduplication_id" {
 
 locals {
   artifact_path = abspath("${var.artifacts_root}/${var.test_name}/${var.artifact_name}.json")
+  payload_sha1  = var.payload != null ? sha1(var.payload) : filesha1(var.payload_file)
 }
 
 resource "terraform_data" "publish" {
   triggers_replace = {
     queue_url                = var.queue_url
-    payload_sha1             = filesha1(var.payload_file)
+    payload_sha1             = local.payload_sha1
     message_group_id         = coalesce(var.message_group_id, "")
     message_deduplication_id = coalesce(var.message_deduplication_id, "")
     artifact_path            = local.artifact_path
+  }
+
+  lifecycle {
+    precondition {
+      condition     = (var.payload == null) != (var.payload_file == null)
+      error_message = "Exactly one of payload or payload_file must be provided."
+    }
   }
 
   provisioner "local-exec" {
@@ -60,7 +74,12 @@ resource "terraform_data" "publish" {
     command     = <<-EOT
       set -euo pipefail
       mkdir -p "$(dirname "$ARTIFACT_PATH")"
-      args=("-m" "website_backend.testing.publish_sqs_message" "--queue-url" "$QUEUE_URL" "--payload-file" "$PAYLOAD_FILE")
+      args=("-m" "website_backend.testing.publish_sqs_message" "--queue-url" "$QUEUE_URL")
+      if [[ -n "$PAYLOAD" ]]; then
+        args+=("--payload" "$PAYLOAD")
+      else
+        args+=("--payload-file" "$PAYLOAD_FILE")
+      fi
       if [[ -n "$MESSAGE_GROUP_ID" ]]; then
         args+=("--message-group-id" "$MESSAGE_GROUP_ID")
       fi
@@ -73,7 +92,8 @@ resource "terraform_data" "publish" {
       ARTIFACT_PATH            = local.artifact_path
       MESSAGE_DEDUPLICATION_ID = coalesce(var.message_deduplication_id, "")
       MESSAGE_GROUP_ID         = coalesce(var.message_group_id, "")
-      PAYLOAD_FILE             = var.payload_file
+      PAYLOAD                  = coalesce(var.payload, "")
+      PAYLOAD_FILE             = coalesce(var.payload_file, "")
       PYTHON_EXECUTABLE        = var.python_executable
       QUEUE_URL                = var.queue_url
     }
