@@ -1,0 +1,13 @@
+{
+  "version": "2026.04",
+  "workflow_name": "example-workflow",
+  "run_id": "run-123",
+  "details": {
+    "input_urls": {
+      "manifest": "s3://example-bucket/runs/run-123/input.json"
+    },
+    "parameters": {
+      "mode": "standard"
+    }
+  }
+}

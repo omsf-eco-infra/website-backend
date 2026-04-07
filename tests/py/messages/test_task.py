@@ -59,6 +59,20 @@ def test_task_message_rejects_non_positive_attempt() -> None:
         )
 
 
+def test_task_message_rejects_wrong_scalar_types() -> None:
+    with pytest.raises(ValidationError):
+        validate_task_message(
+            {
+                "version": CURRENT_CONTRACT_VERSION,
+                "task_type": "openfe_ligand_network",
+                "task_id": "task-2",
+                "attempt": "1",
+                "graph_id": "run-123",
+                "task_details": {},
+            }
+        )
+
+
 def test_task_message_rejects_extra_top_level_fields() -> None:
     with pytest.raises(ValidationError):
         validate_task_message(

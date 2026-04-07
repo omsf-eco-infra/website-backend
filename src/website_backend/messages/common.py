@@ -34,7 +34,7 @@ CURRENT_CONTRACT_VERSION: Version = "2026.04"
 
 
 class MessageModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(strict=True, extra="forbid")
 
 
 MessageDict: TypeAlias = dict[str, Any]

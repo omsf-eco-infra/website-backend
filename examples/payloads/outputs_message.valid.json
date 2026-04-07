@@ -1,0 +1,14 @@
+{
+  "version": "2026.04",
+  "workflow_name": "example-workflow",
+  "run_id": "run-123",
+  "output_urls": {
+    "results": "https://example.com/runs/run-123/results",
+    "status": "https://example.com/runs/run-123/status"
+  },
+  "poll_after_seconds": 30,
+  "details": {
+    "graph_id": "graph-123",
+    "status": "accepted"
+  }
+}
