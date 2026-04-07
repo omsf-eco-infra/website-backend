@@ -76,6 +76,7 @@ The current queue adapters have already established the transport contract used 
 
 The Terraform module boundaries should stay aligned with the architecture document:
 
+- `lambda-deploy`: shared ECR-backed Lambda image publishing module that builds from source, hashes caller-selected source paths, and outputs a digest-pinned image URI for downstream Lambda modules
 - `orchestration`: orchestration queue, shared task topic, orchestrator Lambda, state-store inputs, outputs needed by downstream modules
 - `task-queue`: FIFO SQS task queue, DLQ, SNS subscription and filtering, outputs for compute modules
 - `fargate-compute`: launcher Lambda, ECS task definition, task-topic subscription, queue/network/image inputs
@@ -264,25 +265,34 @@ This module deploys the reusable orchestration core. Its value is not just that 
 
 This is the first Terraform phase that must treat Lambda image wiring and deployed behavior as part of the module contract. The module should not stop at queues, topics, and IAM. It also needs to make the Phase 2 Lambda image deployable and testable.
 
+To keep later Lambda-bearing modules consistent, this phase also establishes a shared `lambda-deploy` Terraform module at `modules/lambda-deploy/`. That module is responsible for building a Lambda container image from local code, pushing it to ECR, and exposing a digest-pinned image URI. Later phases should reuse it for the launcher Lambda and web-interface Lambda instead of reimplementing image build/publish logic.
+
 ### Checklist
 
+- [x] Create the shared `lambda-deploy` Terraform module structure.
+- [x] Define `lambda-deploy` inputs for repository name, Lambda Dockerfile directory, build context directory, explicit source-hash paths, platform/architecture, and tagging.
+- [x] Make `lambda-deploy` create an ECR repository, build and push the Lambda image from local code, and output a digest-pinned image URI.
+- [x] Make `lambda-deploy` hash the caller-selected source paths so OpenTofu rebuilds the image when the Lambda source or shared runtime code changes.
+- [x] Add native `terraform test` coverage for `lambda-deploy` using the example orchestrator Lambda Dockerfile layout in `modules/orchestration/lambda/`.
 - [ ] Create the `orchestration` Terraform module structure.
-- [ ] Define inputs for the orchestration queue, shared task topic behavior, Lambda image configuration, state-store bucket/key configuration, and tagging.
+- [ ] Define inputs for the orchestration queue, shared task topic behavior, state-store bucket/key configuration, and tagging.
 - [ ] Provision the orchestration SQS queue, orchestrator Lambda, IAM permissions, log group, and SNS topic integration required by the architecture.
-- [ ] Wire the module to deploy the Phase 2 Lambda image.
+- [ ] Wire the module to instantiate `lambda-deploy` and deploy the Phase 2 Lambda image.
 - [ ] Expose outputs required by downstream `task-queue` and `web-interface` modules.
-- [ ] Define how the module receives image references during tests and deployments.
+- [ ] Define how the orchestration module passes its Dockerfile, build context, and source-hash inputs into `lambda-deploy` during tests and deployments.
 - [ ] Add native `terraform test` coverage that publishes a sample orchestration message into AWS.
 - [ ] Assert that the deployed Lambda runs, publishes task output onto the shared task topic, and persists graph state to the configured store.
 
 ### Definition of Done
 
+- The shared `lambda-deploy` module can build and publish a Lambda image from local source and is reusable by later Lambda-bearing Terraform phases.
 - The module can be instantiated on its own in the sandbox account.
 - A real orchestration message sent to the deployed resources produces observable orchestration side effects.
 - The module outputs are sufficient for downstream modules without leaking implementation details.
 
 ### Tests
 
+- `terraform test` that provisions `lambda-deploy`, builds the example orchestrator Lambda image, and confirms the pushed tag resolves in ECR.
 - `terraform test` that provisions the module and publishes a sample `ADD_TASKS` message.
 - Assertions that the task topic receives the expected downstream payload.
 - Assertions that graph state is persisted to the configured S3 location.
@@ -370,6 +380,7 @@ This phase must also prove that the deployed compute path actually works in AWS.
 - [ ] Create the `fargate-compute` Terraform module structure.
 - [ ] Provision launcher subscription wiring, ECS task definition, IAM, logging, and required networking inputs.
 - [ ] Accept a container image URI as an input instead of building container images inside the module.
+- [ ] Reuse `lambda-deploy` for the Phase 5 launcher Lambda image while continuing to accept a separate ECS worker image URI as an input.
 - [ ] Wire the module to the `task-queue` outputs and shared task topic conventions.
 - [ ] Add a lightweight generic example worker image for integration tests.
 - [ ] Define the observable side effect used by tests to prove worker execution.
@@ -438,7 +449,7 @@ This module is where the platform becomes externally visible. Because of that, i
 
 - [ ] Create the `web-interface` Terraform module structure.
 - [ ] Provision the web Lambda, Function URL, input/output buckets, IAM permissions, logging, and orchestration queue access.
-- [ ] Wire the module to deploy the Phase 7 Lambda image.
+- [ ] Reuse `lambda-deploy` to build and deploy the Phase 7 Lambda image.
 - [ ] Expose the Function URL and relevant bucket outputs needed by the website.
 - [ ] Define any bucket prefix conventions required by the reusable platform layer.
 - [ ] Add native `terraform test` coverage that invokes the deployed Function URL with a generic sample input.

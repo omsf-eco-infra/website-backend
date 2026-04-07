@@ -2,6 +2,7 @@
 
 Reusable Terraform modules live in this directory.
 
+- `lambda-deploy`
 - `orchestration`
 - `task-queue`
 - `fargate-compute`

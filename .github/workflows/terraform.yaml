@@ -70,3 +70,6 @@ jobs:
 
       - name: Run real-AWS OpenTofu CI smoke test
         run: pixi run -e dev test-tf-ci-smoke
+
+      - name: Run real-AWS lambda-deploy module test
+        run: pixi run -e dev test-tf-lambda-deploy
