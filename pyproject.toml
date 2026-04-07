@@ -39,11 +39,3 @@ dev = { features = ["dev"], solve-group = "default" }
 [tool.pixi.tasks]
 test-py = "python -m pytest tests/py"
 test-py-cov = "python -m pytest --cov=src/website_backend --cov-report=xml:coverage.xml tests/py"
-_init-tf-support-smoke = "tofu -chdir=tests/tf/support/smoke init"
-_init-tf-ci-smoke = "tofu -chdir=tests/tf/ci-smoke init"
-_init-tf-lambda-deploy = "tofu -chdir=tests/tf/lambda-deploy init"
-_init-tf-orchestration = "tofu -chdir=tests/tf/orchestration init"
-test-tf-support-smoke = { cmd = "tofu -chdir=tests/tf/support/smoke test -test-directory=.", depends-on = ["_init-tf-support-smoke"] }
-test-tf-ci-smoke = { cmd = "tofu -chdir=tests/tf/ci-smoke test -test-directory=.", depends-on = ["_init-tf-ci-smoke"] }
-test-tf-lambda-deploy = { cmd = "tofu -chdir=tests/tf/lambda-deploy test -test-directory=.", depends-on = ["_init-tf-lambda-deploy"] }
-test-tf-orchestration = { cmd = "tofu -chdir=tests/tf/orchestration test -test-directory=.", depends-on = ["_init-tf-orchestration"] }

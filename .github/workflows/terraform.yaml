@@ -31,7 +31,9 @@ jobs:
           cache-write: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Run local OpenTofu support smoke test
-        run: pixi run -e dev test-tf-support-smoke
+        run: |
+          pixi run -e dev tofu -chdir=tests/tf/support/smoke init
+          pixi run -e dev tofu -chdir=tests/tf/support/smoke test -test-directory=.
 
   ci-smoke:
     runs-on: ubuntu-latest
@@ -69,7 +71,16 @@ jobs:
           role-session-name: website-backend-ci-${{ github.run_id }}
 
       - name: Run real-AWS OpenTofu CI smoke test
-        run: pixi run -e dev test-tf-ci-smoke
+        run: |
+          pixi run -e dev tofu -chdir=tests/tf/ci-smoke init
+          pixi run -e dev tofu -chdir=tests/tf/ci-smoke test -test-directory=.
 
       - name: Run real-AWS lambda-deploy module test
-        run: pixi run -e dev test-tf-lambda-deploy
+        run: |
+          pixi run -e dev tofu -chdir=tests/tf/lambda-deploy init
+          pixi run -e dev tofu -chdir=tests/tf/lambda-deploy test -test-directory=.
+
+      - name: Run real-AWS orchestration module test
+        run: |
+          pixi run -e dev tofu -chdir=tests/tf/orchestration init
+          pixi run -e dev tofu -chdir=tests/tf/orchestration test -test-directory=.

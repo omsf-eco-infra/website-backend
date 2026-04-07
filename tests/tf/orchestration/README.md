@@ -10,7 +10,8 @@ and asserts both downstream task fanout and persisted taskdb snapshot state.
 Run it with sandbox AWS credentials available in the environment:
 
 ```bash
-pixi run -e dev test-tf-orchestration
+pixi run -e dev tofu -chdir=tests/tf/orchestration init
+pixi run -e dev tofu -chdir=tests/tf/orchestration test -test-directory=.
 ```
 
 Optional variables:

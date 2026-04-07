@@ -69,19 +69,29 @@ pixi run -e dev test-py
 Infra tests run through Pixi so the Python helper dependencies are available. Run `tofu test` from the concrete harness root:
 
 ```bash
-pixi run -e dev test-tf-support-smoke
+pixi run -e dev tofu -chdir=tests/tf/support/smoke init
+pixi run -e dev tofu -chdir=tests/tf/support/smoke test -test-directory=.
 ```
 
 Run the GitHub Actions real-AWS smoke test with sandbox AWS credentials configured in your shell:
 
 ```bash
-pixi run -e dev test-tf-ci-smoke
+pixi run -e dev tofu -chdir=tests/tf/ci-smoke init
+pixi run -e dev tofu -chdir=tests/tf/ci-smoke test -test-directory=.
 ```
 
 Run the real-AWS `lambda-deploy` module test with sandbox AWS credentials configured in your shell:
 
 ```bash
-pixi run -e dev test-tf-lambda-deploy
+pixi run -e dev tofu -chdir=tests/tf/lambda-deploy init
+pixi run -e dev tofu -chdir=tests/tf/lambda-deploy test -test-directory=.
+```
+
+Run the real-AWS `orchestration` module test with sandbox AWS credentials configured in your shell:
+
+```bash
+pixi run -e dev tofu -chdir=tests/tf/orchestration init
+pixi run -e dev tofu -chdir=tests/tf/orchestration test -test-directory=.
 ```
 
 Conventions:

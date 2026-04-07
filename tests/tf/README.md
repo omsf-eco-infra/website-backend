@@ -8,7 +8,6 @@ Conventions:
 - Keep module-name directories aligned with `modules/`, for example `tests/tf/lambda-deploy/`, `tests/tf/orchestration/`, and `tests/tf/web-interface/`.
 - On first use for a harness root, run `pixi run -e dev tofu -chdir=tests/tf/<module-name> init`.
 - Run infra tests with `pixi run -e dev tofu -chdir=tests/tf/<module-name> test -test-directory=.`
-- The canonical repo tasks are `pixi run -e dev test-tf-support-smoke`, `pixi run -e dev test-tf-ci-smoke`, and `pixi run -e dev test-tf-lambda-deploy`.
 - Keep shared helper wrapper modules under `tests/tf/support/modules/`.
 - Invoke Python helpers from those wrappers as `python -m website_backend.testing.<module>`.
 - Keep local smoke tests for the wrapper pattern under `tests/tf/support/`.
