@@ -36,6 +36,8 @@ publishes runnable `TaskMessage` payloads to the shared task topic.
   message is moved to the orchestration DLQ
 - `enable_state_bucket_versioning`: enables S3 versioning on the taskdb bucket;
   disabled by default because the state snapshots are high-churn
+- `state_bucket_force_destroy`: allows Terraform to destroy the taskdb bucket
+  even when snapshot objects remain; disabled by default for production safety
 
 Derived resource names:
 
@@ -64,6 +66,9 @@ Derived resource names:
   current S3-backed SQLite implementation assumes a single active writer.
 - The orchestration queue uses `batch_size = 1` because the current Lambda
   handler only accepts one SQS record at a time.
+- The Lambda role includes `s3:ListBucket` on the state bucket in addition to
+  object reads and writes so its initial `HeadObject` checks can distinguish a
+  missing snapshot from an access error on a new graph.
 - The task SNS topic is FIFO with content-based deduplication. The runtime
   publishes `MessageGroupId = graph_id` so later FIFO task queues can subscribe
   without changing the message contract.

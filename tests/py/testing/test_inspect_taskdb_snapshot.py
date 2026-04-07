@@ -51,6 +51,9 @@ def test_inspect_taskdb_snapshot_returns_task_metadata(tmp_path) -> None:
     assert result["tasks_by_id"]["task-a"]["task_details"] == {"stage": "a"}
     assert result["tasks_by_id"]["task-a"]["attempt"] == 1
     assert result["tasks_by_id"]["task-a"]["task_record"]["tries"] == 1
+    assert isinstance(
+        result["tasks_by_id"]["task-a"]["task_record"]["last_modified"], str
+    )
     assert result["tasks_by_id"]["task-c"]["task_type"] == "collect_outputs"
     assert result["tasks_by_id"]["task-c"]["task_details"] == {"stage": "c"}
     assert result["tasks_by_id"]["task-c"]["attempt"] == 0
@@ -70,7 +73,14 @@ def test_inspect_taskdb_snapshot_returns_exists_false_for_missing_key() -> None:
         client=s3,
     )
 
-    assert result == {"exists": False}
+    assert result == {
+        "exists": False,
+        "etag": None,
+        "content_length": None,
+        "task_count": 0,
+        "task_ids": [],
+        "tasks_by_id": {},
+    }
 
 
 @mock_aws

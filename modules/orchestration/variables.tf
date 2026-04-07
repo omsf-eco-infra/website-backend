@@ -137,3 +137,9 @@ variable "enable_state_bucket_versioning" {
   type        = bool
   default     = false
 }
+
+variable "state_bucket_force_destroy" {
+  description = "Whether Terraform may delete non-empty objects when destroying the taskdb state bucket. Disabled by default for production safety."
+  type        = bool
+  default     = false
+}

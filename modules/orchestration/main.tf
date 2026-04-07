@@ -22,8 +22,9 @@ module "orchestrator_image" {
 }
 
 resource "aws_s3_bucket" "state" {
-  bucket = local.state_bucket_name
-  tags   = var.tags
+  bucket        = local.state_bucket_name
+  force_destroy = var.state_bucket_force_destroy
+  tags          = var.tags
 }
 
 resource "aws_s3_bucket_versioning" "state" {
@@ -96,6 +97,15 @@ resource "aws_iam_role_policy_attachment" "basic_execution" {
 
 data "aws_iam_policy_document" "orchestrator" {
   statement {
+    sid    = "AllowStateBucketList"
+    effect = "Allow"
+    actions = [
+      "s3:ListBucket",
+    ]
+    resources = [aws_s3_bucket.state.arn]
+  }
+
+  statement {
     sid    = "AllowStateObjectAccess"
     effect = "Allow"
     actions = [
@@ -112,6 +122,18 @@ data "aws_iam_policy_document" "orchestrator" {
       "sns:Publish",
     ]
     resources = [aws_sns_topic.tasks.arn]
+  }
+
+  statement {
+    sid    = "AllowOrchestrationQueueConsume"
+    effect = "Allow"
+    actions = [
+      "sqs:ChangeMessageVisibility",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:ReceiveMessage",
+    ]
+    resources = [aws_sqs_queue.orchestration.arn]
   }
 }
 
@@ -161,4 +183,6 @@ resource "aws_lambda_event_source_mapping" "orchestration" {
   function_name    = aws_lambda_function.orchestrator.arn
   batch_size       = 1
   enabled          = true
+
+  depends_on = [aws_iam_role_policy.orchestrator]
 }

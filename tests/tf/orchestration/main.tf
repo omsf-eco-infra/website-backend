@@ -107,10 +107,11 @@ locals {
 module "module_under_test" {
   source = "../../../modules/orchestration"
 
-  name_prefix       = local.name_prefix
-  workflow_name     = "example-workflow"
-  dockerfile_dir    = "${local.repo_root}/modules/orchestration/lambda"
-  build_context_dir = local.repo_root
+  name_prefix                = local.name_prefix
+  workflow_name              = "example-workflow"
+  state_bucket_force_destroy = true
+  dockerfile_dir             = "${local.repo_root}/modules/orchestration/lambda"
+  build_context_dir          = local.repo_root
   source_hash_paths = [
     "${local.repo_root}/pyproject.toml",
     "${local.repo_root}/src/website_backend",

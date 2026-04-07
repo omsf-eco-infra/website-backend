@@ -97,12 +97,12 @@ run "dag_progression" {
   }
 
   assert {
-    condition     = output.initial_task_ids == ["task-a", "task-b"]
+    condition     = output.initial_task_ids == tolist(["task-a", "task-b"])
     error_message = "The initial runnable tasks were not task-a and task-b."
   }
 
   assert {
-    condition     = output.initial_task_graph_ids == [output.graph_id]
+    condition     = output.initial_task_graph_ids == tolist([output.graph_id])
     error_message = "The initial task messages did not all carry the expected graph_id."
   }
 
@@ -162,7 +162,7 @@ run "dag_progression" {
   }
 
   assert {
-    condition     = output.final_task_ids == ["task-c"]
+    condition     = output.final_task_ids == tolist(["task-c"])
     error_message = "The final runnable task was not task-c."
   }
 

@@ -92,8 +92,8 @@ resource "terraform_data" "publish" {
       ARTIFACT_PATH            = local.artifact_path
       MESSAGE_DEDUPLICATION_ID = coalesce(var.message_deduplication_id, "")
       MESSAGE_GROUP_ID         = coalesce(var.message_group_id, "")
-      PAYLOAD                  = coalesce(var.payload, "")
-      PAYLOAD_FILE             = coalesce(var.payload_file, "")
+      PAYLOAD                  = var.payload != null ? var.payload : ""
+      PAYLOAD_FILE             = var.payload_file != null ? var.payload_file : ""
       PYTHON_EXECUTABLE        = var.python_executable
       QUEUE_URL                = var.queue_url
     }

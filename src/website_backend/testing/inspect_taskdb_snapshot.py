@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from datetime import date, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -37,6 +38,10 @@ def _is_not_found_error(error: ClientError) -> bool:
 
 
 def _normalize_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
     if isinstance(value, dict):
         return {str(key): _normalize_value(item) for key, item in value.items()}
     if isinstance(value, list):
@@ -44,6 +49,17 @@ def _normalize_value(value: Any) -> Any:
     if isinstance(value, tuple):
         return [_normalize_value(item) for item in value]
     return value
+
+
+def _missing_snapshot_summary() -> dict[str, Any]:
+    return {
+        "exists": False,
+        "etag": None,
+        "content_length": None,
+        "task_count": 0,
+        "task_ids": [],
+        "tasks_by_id": {},
+    }
 
 
 def _load_snapshot_summary(path: Path) -> dict[str, Any]:
@@ -116,7 +132,7 @@ def inspect_snapshot(
             if not _is_not_found_error(error):
                 raise
             if timer() >= deadline:
-                return {"exists": False}
+                return _missing_snapshot_summary()
             sleeper(poll_interval_seconds)
             continue
 
