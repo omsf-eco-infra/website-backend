@@ -83,6 +83,22 @@ def test_outputs_message_rejects_non_positive_poll_after_seconds() -> None:
         )
 
 
+def test_outputs_message_rejects_wrong_scalar_types() -> None:
+    with pytest.raises(ValidationError):
+        validate_outputs_message(
+            {
+                "version": "2026-05",
+                "workflow_name": "example-workflow",
+                "run_id": "run-123",
+                "output_urls": {
+                    "status": "https://example.com/runs/run-123/status",
+                },
+                "poll_after_seconds": "30",
+                "details": {},
+            }
+        )
+
+
 def test_outputs_message_rejects_extra_top_level_fields() -> None:
     with pytest.raises(ValidationError):
         validate_outputs_message(

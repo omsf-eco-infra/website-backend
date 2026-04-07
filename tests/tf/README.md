@@ -1,6 +1,6 @@
-# Terraform tests
+# OpenTofu Tests
 
-Native `terraform test` fixtures and assertions live here.
+OpenTofu `tofu test` fixtures and Terraform-compatible assertions live here.
 
 Conventions:
 
@@ -15,4 +15,4 @@ Conventions:
 - Keep the GitHub Actions real-AWS smoke harness under `tests/tf/ci-smoke/`.
 - Keep module-specific real-AWS harnesses such as `tests/tf/lambda-deploy/` alongside their corresponding module names.
 - Mutating helper wrappers write JSON artifacts under `.tf-test-artifacts/`.
-- Reserve this tree for Terraform test inputs, assertions, and supporting fixture files, not for generic example payloads.
+- Reserve this tree for OpenTofu/Terraform-compatible test inputs, assertions, and supporting fixture files, not for generic example payloads.

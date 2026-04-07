@@ -101,10 +101,14 @@ def read_messages(
     messages_by_id: dict[str, dict[str, Any]] = {}
 
     while True:
+        remaining_seconds = deadline - timer()
+        if remaining_seconds <= 0:
+            break
+
         response = sqs_client.receive_message(
             QueueUrl=queue_url,
             MaxNumberOfMessages=max_number_of_messages,
-            WaitTimeSeconds=wait_time_seconds,
+            WaitTimeSeconds=min(wait_time_seconds, int(remaining_seconds)),
             AttributeNames=["All"],
             MessageAttributeNames=["All"],
         )
