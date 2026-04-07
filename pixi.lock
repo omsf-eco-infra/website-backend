@@ -1364,7 +1364,7 @@ packages:
 - pypi: ./
   name: website-backend
   version: 0.1.0
-  sha256: 28aaad60316fa9b2cd051b3d758a0eb7b2cf875b9e6d358828dd374a15d65e2a
+  sha256: b329371051246066f5be0f9c480ea45019c584a65970a9b0aa0ecb1c90753733
   requires_dist:
   - pydantic>=2,<3
   - boto3
