@@ -7,7 +7,7 @@ This repository is building reusable AWS workflow-platform components. Phase 0 l
 - `src/website_backend/`: reusable Python runtime code
 - `tests/py/`: Python unit tests
 - `modules/`: reusable Terraform modules
-- `tests/tf/`: native `terraform test` fixtures and assertions
+- `tests/tf/`: OpenTofu `tofu test` fixtures and Terraform-compatible assertions
 - `examples/`: generic example payloads, assets, and container contexts
 - `scripts/`: shell helpers if a future phase needs them
 

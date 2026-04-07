@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import boto3
 from moto import mock_aws
@@ -37,4 +38,31 @@ def test_read_sqs_messages_returns_raw_sqs_message_payload() -> None:
             "DataType": "String",
             "StringValue": "example",
         }
+    }
+
+
+def test_read_sqs_messages_clamps_long_poll_to_remaining_timeout() -> None:
+    wait_times: list[int] = []
+
+    class RecordingClient:
+        def receive_message(self, **kwargs: Any) -> dict[str, Any]:
+            wait_times.append(kwargs["WaitTimeSeconds"])
+            return {}
+
+    timer_values = iter([100.0, 100.0, 103.0])
+
+    result = read_sqs_messages.read_messages(
+        queue_url="https://example.invalid/queue",
+        wait_time_seconds=10,
+        timeout_seconds=3,
+        poll_interval_seconds=0,
+        client=RecordingClient(),
+        sleeper=lambda _: None,
+        timer=lambda: next(timer_values),
+    )
+
+    assert wait_times == [3]
+    assert result == {
+        "message_count": 0,
+        "messages": [],
     }

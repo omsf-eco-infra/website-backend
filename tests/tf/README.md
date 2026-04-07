@@ -1,6 +1,6 @@
-# Terraform tests
+# OpenTofu Tests
 
-Native `terraform test` fixtures and assertions live here.
+OpenTofu `tofu test` fixtures and Terraform-compatible assertions live here.
 
 Conventions:
 
@@ -12,4 +12,4 @@ Conventions:
 - Invoke Python helpers from those wrappers as `python -m website_backend.testing.<module>`.
 - Keep local smoke tests for the wrapper pattern under `tests/tf/support/`.
 - Mutating helper wrappers write JSON artifacts under `.tf-test-artifacts/`.
-- Reserve this tree for Terraform test inputs, assertions, and supporting fixture files, not for generic example payloads.
+- Reserve this tree for OpenTofu/Terraform-compatible test inputs, assertions, and supporting fixture files, not for generic example payloads.
