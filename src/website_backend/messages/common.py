@@ -31,7 +31,7 @@ UrlMap: TypeAlias = dict[NonEmptyStr, AnyUrl]
 
 
 class MessageModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(strict=True, extra="forbid")
 
 
 MessageDict: TypeAlias = dict[str, Any]

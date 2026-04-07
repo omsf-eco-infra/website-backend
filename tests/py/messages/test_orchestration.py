@@ -117,6 +117,18 @@ def test_orchestration_message_rejects_missing_required_fields() -> None:
         )
 
 
+def test_orchestration_message_rejects_wrong_scalar_types() -> None:
+    with pytest.raises(ValidationError):
+        validate_orchestration_message(
+            {
+                "version": "2026-05",
+                "graph_id": "run-123",
+                "message_type": "TASK_COMPLETED",
+                "details": {"task_id": 2},
+            }
+        )
+
+
 def test_orchestration_message_rejects_extra_top_level_fields() -> None:
     with pytest.raises(ValidationError):
         validate_orchestration_message(

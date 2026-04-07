@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from website_backend.messages import (
-    TaskMessage,
     dump_message,
     dump_message_json,
     validate_task_message,
@@ -52,6 +51,20 @@ def test_task_message_rejects_non_positive_attempt() -> None:
                 "task_type": "openfe_ligand_network",
                 "task_id": "task-2",
                 "attempt": 0,
+                "graph_id": "run-123",
+                "task_details": {},
+            }
+        )
+
+
+def test_task_message_rejects_wrong_scalar_types() -> None:
+    with pytest.raises(ValidationError):
+        validate_task_message(
+            {
+                "version": "2026-05",
+                "task_type": "openfe_ligand_network",
+                "task_id": "task-2",
+                "attempt": "1",
                 "graph_id": "run-123",
                 "task_details": {},
             }
