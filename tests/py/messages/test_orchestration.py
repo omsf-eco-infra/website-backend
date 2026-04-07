@@ -262,6 +262,17 @@ class TestOrchestrationMessage:
                 }
             )
 
+    def test_rejects_wrong_scalar_types(self) -> None:
+        with pytest.raises(ValidationError):
+            validate_orchestration_message(
+                {
+                    "version": CURRENT_CONTRACT_VERSION,
+                    "graph_id": "run-123",
+                    "message_type": "TASK_COMPLETED",
+                    "details": {"task_id": 2},
+                }
+            )
+
     def test_rejects_extra_top_level_fields(self) -> None:
         with pytest.raises(ValidationError):
             validate_orchestration_message(

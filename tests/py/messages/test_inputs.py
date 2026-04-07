@@ -51,6 +51,18 @@ def test_inputs_message_rejects_missing_required_fields() -> None:
         )
 
 
+def test_inputs_message_rejects_wrong_scalar_types() -> None:
+    with pytest.raises(ValidationError):
+        validate_inputs_message(
+            {
+                "version": "2026-05",
+                "workflow_name": "example-workflow",
+                "run_id": 123,
+                "details": {},
+            }
+        )
+
+
 def test_inputs_message_rejects_extra_top_level_fields() -> None:
     with pytest.raises(ValidationError):
         validate_inputs_message(
