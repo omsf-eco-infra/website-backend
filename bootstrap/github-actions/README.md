@@ -9,7 +9,7 @@ to run real-AWS Terraform smoke tests with GitHub OIDC.
   unless you pass an existing provider ARN
 - one repository-scoped IAM role for GitHub Actions
 - a broad sandbox inline policy intended for test infrastructure work in this repo
-- GitHub Actions repository variables for the AWS role ARN and region
+- GitHub Actions repository secrets for the AWS role ARN and region
 
 The role trust policy is scoped to:
 
@@ -28,7 +28,7 @@ The role trust policy is scoped to:
 ## Apply
 
 Run this from an admin-capable shell session with AWS credentials and a GitHub
-token that can manage repository Actions variables, for example `GITHUB_TOKEN`:
+token that can manage repository Actions secrets, for example `GITHUB_TOKEN`:
 
 ```bash
 export GITHUB_TOKEN=...
@@ -41,11 +41,11 @@ tofu -chdir=bootstrap/github-actions apply \
   -var role_name=website-backend-github-actions
 ```
 
-## GitHub repository variables
+## GitHub repository secrets
 
-This stack manages these repository variables automatically:
+This stack manages these repository secrets automatically:
 
 - `AWS_GHA_TEST_ROLE_ARN`
 - `AWS_REGION`
 
-These are repository variables, not secrets.
+The workflows read these as GitHub Actions secrets.

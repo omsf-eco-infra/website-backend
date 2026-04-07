@@ -18,10 +18,10 @@ locals {
     repo       = var.github_repo
     component  = "github-actions"
   }
-  role_arn_variable_name = "AWS_GHA_TEST_ROLE_ARN"
-  region_variable_name   = "AWS_REGION"
-  role_pattern_arn       = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/wb-*"
-  policy_pattern_arn     = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:policy/wb-*"
+  role_arn_secret_name = "AWS_GHA_TEST_ROLE_ARN"
+  region_secret_name   = "AWS_REGION"
+  role_pattern_arn     = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/wb-*"
+  policy_pattern_arn   = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:policy/wb-*"
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -171,14 +171,14 @@ resource "aws_iam_role_policy" "github_actions" {
   policy = data.aws_iam_policy_document.permissions.json
 }
 
-resource "github_actions_variable" "aws_gha_test_role_arn" {
-  repository    = var.github_repo
-  variable_name = local.role_arn_variable_name
-  value         = aws_iam_role.github_actions.arn
+resource "github_actions_secret" "aws_gha_test_role_arn" {
+  repository      = var.github_repo
+  secret_name     = local.role_arn_secret_name
+  plaintext_value = aws_iam_role.github_actions.arn
 }
 
-resource "github_actions_variable" "aws_region" {
-  repository    = var.github_repo
-  variable_name = local.region_variable_name
-  value         = var.aws_region
+resource "github_actions_secret" "aws_region" {
+  repository      = var.github_repo
+  secret_name     = local.region_secret_name
+  plaintext_value = var.aws_region
 }
