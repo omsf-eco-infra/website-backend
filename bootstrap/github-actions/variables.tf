@@ -31,3 +31,12 @@ variable "existing_oidc_provider_arn" {
   type        = string
   default     = null
 }
+
+variable "oidc_thumbprint_list" {
+  description = "Thumbprints trusted for the GitHub Actions OIDC provider."
+  type        = list(string)
+  default = [
+    "6938fd4d98bab03faadb97b34396831e3780aea1",
+    "1c58a3a8518e8759bf075b76b750d4f2df264fcd",
+  ]
+}

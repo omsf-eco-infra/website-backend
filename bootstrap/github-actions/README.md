@@ -24,6 +24,7 @@ The role trust policy is scoped to:
 - `github_repo`: defaults to `website-backend`
 - `allowed_branch_names`: defaults to `["main"]`
 - `existing_oidc_provider_arn`: optional ARN for an already-created GitHub OIDC provider
+- `oidc_thumbprint_list`: defaults to the two GitHub-published AWS OIDC thumbprints
 
 ## Apply
 
@@ -49,3 +50,13 @@ This stack manages these repository secrets automatically:
 - `AWS_REGION`
 
 The workflows read these as GitHub Actions secrets.
+
+## OIDC thumbprints
+
+When this stack creates the OIDC provider itself, it pins the default
+thumbprints published by GitHub for AWS OIDC integration:
+
+- `6938fd4d98bab03faadb97b34396831e3780aea1`
+- `1c58a3a8518e8759bf075b76b750d4f2df264fcd`
+
+Source: [GitHub Actions – Update on OIDC integration with AWS](https://github.blog/changelog/2023-06-27-github-actions-update-on-oidc-integration-with-aws/)
