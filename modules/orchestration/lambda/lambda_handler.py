@@ -20,7 +20,7 @@ def s3_sqlite_handler(event: dict[str, Any], context: Any) -> bool:
 
     # This runtime accepts STATE_PREFIX in its environment contract, but the
     # message graph_id remains the authoritative full S3 key in Phase 2.
-    os.environ.get("STATE_PREFIX")
+    # state_prefix = os.environ.get("STATE_PREFIX")
 
     # This handler expects to be invoked by the orchestration SQS queue event
     # source mapping, so Lambda owns queue acknowledgement and provides the
