@@ -308,13 +308,13 @@ The main architectural point is that the shared task SNS topic can serve many ta
 
 ### Checklist
 
-- [ ] Create the `task-queue` Terraform module structure.
-- [ ] Provision one FIFO SQS queue plus one DLQ with redrive settings.
-- [ ] Add queue policy and subscription wiring from the shared task SNS topic.
-- [ ] Implement task routing with SNS subscription filters on the shared `task_type` message attribute.
-- [ ] Expose queue URLs, ARNs, and any policy outputs required by compute modules.
-- [ ] Wire the module to the established transport contract: canonical JSON message bodies plus shared `version`, `message_type`, and `task_type` AWS message attributes when present.
-- [ ] Add native `terraform test` coverage for both matching and non-matching task publications.
+- [x] Create the `task-queue` Terraform module structure.
+- [x] Provision one FIFO SQS queue plus one DLQ with redrive settings.
+- [x] Add queue policy and subscription wiring from the shared task SNS topic.
+- [x] Implement task routing with SNS subscription filters on the shared `task_type` message attribute.
+- [x] Expose queue URLs, ARNs, and any policy outputs required by compute modules.
+- [x] Wire the module to the established transport contract: canonical JSON message bodies plus shared `version`, `message_type`, and `task_type` AWS message attributes when present.
+- [x] Add native `terraform test` coverage for both matching and non-matching task publications.
 
 ### Definition of Done
 
