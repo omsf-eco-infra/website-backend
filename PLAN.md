@@ -137,7 +137,8 @@ This phase should also define how repo-level tooling supports both Python unit t
 - Runtime configuration:
   - deployment-specific values are injected per Lambda function or per ECS task definition, not at image build time
   - document only the environment variables a given runtime consumes; do not define one global superset that every runtime receives
-  - use descriptive resource-oriented names without a repo prefix, such as `WORKFLOW_NAME`, `STATE_BUCKET`, `STATE_PREFIX`, `TASK_TOPIC_ARN`, `ORCHESTRATION_QUEUE_URL`, `INPUTS_BUCKET`, `OUTPUTS_BUCKET`, `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `SUBNET_IDS`, and `SECURITY_GROUP_IDS`
+  - use descriptive resource-oriented names without a repo prefix, such as `WORKFLOW_NAME`, `STATE_BUCKET`, `STATE_PREFIX`, `TASK_TOPIC_ARN`, `ORCHESTRATION_QUEUE_URL`, `INPUTS_BUCKET`, `OUTPUTS_BUCKET`, `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `ECS_CONTAINER_NAME`, `TASK_QUEUE_URL`, `SUBNET_IDS`, and `SECURITY_GROUP_IDS`
+  - for the Fargate compute path, keep stable worker values like `WORKFLOW_NAME` and `TASK_QUEUE_URL` on the ECS task definition, and let the launcher inject only per-task metadata like `GRAPH_ID`, `TASK_ID`, `TASK_TYPE`, and `TASK_ATTEMPT`
   - keep secrets out of this shared contract; later phases should use AWS secret-management mechanisms if they introduce secrets
 - OpenTofu helper harness:
   - infra tests run as `pixi run -e dev tofu -chdir=tests/tf/<module-name> test -test-directory=.`
@@ -341,17 +342,25 @@ The launcher's job is narrow:
 - derive the correct ECS `RunTask` request
 - pass enough metadata for the worker to find and process queue items
 
+The runtime contract should stay split between deployment-time worker
+configuration and launch-time task metadata:
+
+- stable worker values such as `WORKFLOW_NAME` and `TASK_QUEUE_URL` belong on
+  the ECS task definition configured by Terraform
+- per-task values such as `graph_id`, `task_id`, `task_type`, and `attempt`
+  are passed by the launcher through ECS container overrides
+
 This Lambda should not interpret workflow-specific task payloads. It only needs to supply queue identity, run context, and runtime configuration to the worker task.
 
 ### Checklist
 
-- [ ] Implement the SNS-triggered Lambda entrypoint for task-available events.
-- [ ] Define the configuration contract for ECS cluster, task definition, launch type, networking, and queue metadata.
-- [ ] Build the ECS `RunTask` request using injected configuration and event context.
-- [ ] Pass queue metadata and any required run/task context through container overrides or environment variables.
-- [ ] Define behavior for duplicate notifications so the launcher remains safe under at-least-once delivery.
-- [ ] Define behavior for ECS launch failures, transient AWS API failures, and invalid configuration.
-- [ ] Keep the launcher logic independent of workflow-specific task schemas.
+- [x] Implement the SNS-triggered Lambda entrypoint for task-available events.
+- [x] Define the configuration contract for ECS cluster, task definition, launch type, networking, and queue metadata.
+- [x] Build the ECS `RunTask` request using injected configuration and event context.
+- [x] Pass queue metadata and any required run/task context through container overrides or environment variables.
+- [x] Define behavior for duplicate notifications so the launcher remains safe under at-least-once delivery.
+- [x] Define behavior for ECS launch failures, transient AWS API failures, and invalid configuration.
+- [x] Keep the launcher logic independent of workflow-specific task schemas.
 
 ### Definition of Done
 
