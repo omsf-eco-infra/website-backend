@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, Mapping, Protocol, TypeVar
+from typing import Any, Generic, Mapping, Protocol
 
-MessageT = TypeVar("MessageT")
+from website_backend.queues.types import MessageT
 
 
 @dataclass(frozen=True, slots=True)

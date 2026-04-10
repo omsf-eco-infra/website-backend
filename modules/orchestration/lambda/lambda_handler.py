@@ -12,8 +12,6 @@ from website_backend.runtime import required_env
 
 
 def s3_sqlite_handler(event: dict[str, Any], context: Any) -> bool:
-    del context
-
     required_env("WORKFLOW_NAME")
     bucket = required_env("STATE_BUCKET")
     topic_arn = required_env("TASK_TOPIC_ARN")
