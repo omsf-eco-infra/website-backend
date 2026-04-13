@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from website_backend.messages import (
+    CURRENT_CONTRACT_VERSION,
     OutputsMessage,
     dump_message,
     dump_message_json,
@@ -17,7 +18,7 @@ def test_outputs_message_parses_urls_and_polling_guidance() -> None:
     nested_details = {"graph_id": "graph-123", "status": "accepted"}
     message = validate_outputs_message(
         {
-            "version": "2026-05",
+            "version": CURRENT_CONTRACT_VERSION,
             "workflow_name": "example-workflow",
             "run_id": "run-123",
             "output_urls": {
@@ -39,7 +40,7 @@ def test_outputs_message_parses_urls_and_polling_guidance() -> None:
     )
     assert message.details == nested_details
     assert dump_message(message) == {
-        "version": "2026-05",
+        "version": CURRENT_CONTRACT_VERSION,
         "workflow_name": "example-workflow",
         "run_id": "run-123",
         "output_urls": {
@@ -56,7 +57,7 @@ def test_outputs_message_rejects_invalid_url_values() -> None:
     with pytest.raises(ValidationError):
         validate_outputs_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "workflow_name": "example-workflow",
                 "run_id": "run-123",
                 "output_urls": {"status": "not-a-url"},
@@ -70,7 +71,7 @@ def test_outputs_message_rejects_non_positive_poll_after_seconds() -> None:
     with pytest.raises(ValidationError):
         validate_outputs_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "workflow_name": "example-workflow",
                 "run_id": "run-123",
                 "output_urls": {
@@ -102,7 +103,7 @@ def test_outputs_message_rejects_extra_top_level_fields() -> None:
     with pytest.raises(ValidationError):
         validate_outputs_message(
             {
-                "version": "2026-05",
+                "version": CURRENT_CONTRACT_VERSION,
                 "workflow_name": "example-workflow",
                 "run_id": "run-123",
                 "output_urls": {

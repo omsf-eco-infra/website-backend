@@ -29,6 +29,7 @@ ENV/
 env/
 htmlcov/
 venv/
+*.egg-info/
 
 # Terraform / OpenTofu
 .terraform/

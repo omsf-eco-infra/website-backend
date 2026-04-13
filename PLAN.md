@@ -38,9 +38,11 @@ These contracts should be treated as stable early so later phases do not redefin
 - `workflow_name`: identifies the deployed workflow variant; used for validation and routing at the web edge
 - `version`: version of the message contract
 - `run_id`: identifies a user-visible run
-- `graph_id`: identifies the orchestration graph managed by Exorcist
+- `graph_id`: identifies the orchestration graph managed by Exorcist and is the run locator carried by orchestration/task messages
 - `task_id`: identifies a task within a graph
 - `task_type`: dispatch key for worker routing
+- `max_tries`: per-task retry budget set when tasks are added to a graph
+- `attempt`: current task attempt number carried to workers in `TaskMessage`, starting at 1
 - URL maps: string-to-URL mappings used for output discovery and worker input/output locations
 - opaque `details` objects: workflow-specific payloads that stay untyped at the reusable platform layer
 
@@ -56,6 +58,20 @@ The reusable orchestration layer should expose clear boundaries for:
 
 The orchestrator should remain generic. Workflow-specific rules belong upstream in graph construction, not in orchestration execution.
 
+The current Python runtime has already fixed a few important orchestration conventions:
+
+- the reusable orchestrator consumes `InputQueue[OrchestrationMessage]` and publishes `OutputQueue[TaskMessage]`
+- the persistence boundary is one per-graph `taskdb(graph_id)` adapter, not queue-transport metadata
+- queue delivery metadata is only for acknowledgement and transport diagnostics; it is not authoritative for taskdb selection
+
+### AWS transport conventions
+
+The current queue adapters have already established the transport contract used by later Terraform phases:
+
+- queue and topic bodies remain the canonical JSON serialization of the Phase 1 message contracts
+- AWS message attributes are derived from common top-level fields when present: `version`, `message_type`, and `task_type`
+- task-queue routing should use the `task_type` message attribute; the other shared attributes remain available for compatibility checks and observability
+
 ### Terraform module interfaces
 
 The Terraform module boundaries should stay aligned with the architecture document:
@@ -69,11 +85,17 @@ The Terraform module boundaries should stay aligned with the architecture docume
 
 - Exclude all OpenFold/OpenFE-specific task types, metadata schemas, and workflow graphs from this plan.
 - Use one shared task SNS topic in v1, with downstream routing handled by queue subscriptions and filtering.
-- Keep `graph_id` distinct from `run_id` in the reusable contract, even if some initial workflows map them 1:1.
+- Carry `InputsMessage.run_id` into orchestration and task messages as `graph_id`, and treat `graph_id` as the authoritative run locator in the orchestration layer.
+- Within a deployment, `task_type` values are globally meaningful and safe to use as routing keys.
+- Do not add backend-specific message fields for bucket names, table names, schema names, or connection strings; deployment configuration chooses the persistence backend.
 - Use native `terraform test` for Terraform integration tests.
 - Run Terraform integration tests against a real AWS sandbox account, not a local emulator.
 - Python work should use `pytest` through the repo's `pixi` dev environment.
 - Example Lambda and Fargate artifacts exist only to prove module behavior and should stay generic.
+- The current local/reference taskdb backend uses one SQLite file per graph; in that backend, `graph_id` is an absolute filename.
+- The planned AWS backend for Phase 2 keeps the same message contract and treats `graph_id` as a stable S3 object key, with bucket and scratch-path configuration supplied separately.
+- Phase 2 assumes the orchestrator Lambda is the only taskdb writer and runs with reserved concurrency 1 in v1; the initial design does not need to optimize for multi-writer state-store conflicts.
+- The initial Lambda entrypoint may process one orchestration message at a time; later batch support should be a thin wrapper around the same per-message core plus Lambda partial-batch-failure handling.
 
 ## Phase 0: Foundation and Shared Test Harness
 
@@ -114,7 +136,7 @@ This phase should also define how repo-level tooling supports both Python unit t
 - Runtime configuration:
   - deployment-specific values are injected per Lambda function or per ECS task definition, not at image build time
   - document only the environment variables a given runtime consumes; do not define one global superset that every runtime receives
-  - use descriptive resource-oriented names without a repo prefix, such as `CONTRACT_VERSION`, `WORKFLOW_NAME`, `STATE_BUCKET`, `STATE_PREFIX`, `TASK_TOPIC_ARN`, `ORCHESTRATION_QUEUE_URL`, `INPUTS_BUCKET`, `OUTPUTS_BUCKET`, `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `SUBNET_IDS`, and `SECURITY_GROUP_IDS`
+  - use descriptive resource-oriented names without a repo prefix, such as `WORKFLOW_NAME`, `STATE_BUCKET`, `STATE_PREFIX`, `TASK_TOPIC_ARN`, `ORCHESTRATION_QUEUE_URL`, `INPUTS_BUCKET`, `OUTPUTS_BUCKET`, `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `SUBNET_IDS`, and `SECURITY_GROUP_IDS`
   - keep secrets out of this shared contract; later phases should use AWS secret-management mechanisms if they introduce secrets
 - OpenTofu helper harness:
   - infra tests run as `pixi run -e dev tofu -chdir=tests/tf/<module-name> test -test-directory=.`
@@ -193,27 +215,44 @@ To stay reusable, the Lambda should depend on clear adapters for persistence, Ex
 
 ### Checklist
 
-- [ ] Define adapter boundaries for graph persistence, task dispatch, and Exorcist-backed state operations.
-- [ ] Implement the Lambda handler entrypoint and event decoding for orchestration queue messages.
-- [ ] Implement `ADD_TASKS` handling that inserts tasks and immediately dispatches newly runnable work.
-- [ ] Implement `TASK_COMPLETED` handling that marks completion, persists state, and dispatches newly unblocked tasks.
-- [ ] Implement `TASK_ERROR` handling that applies retry/error policy and dispatches follow-on work when appropriate.
-- [ ] Persist graph state to S3 after each accepted mutation.
-- [ ] Define explicit behavior for duplicate completions, duplicate errors, unknown tasks, and no-op events.
-- [ ] Ensure emitted `TaskMessage` payloads come from the shared Phase 1 message contracts.
-- [ ] Keep task-type routing generic and driven by message content plus dispatch configuration.
+- [x] Define adapter boundaries for graph persistence, task dispatch, and Exorcist-backed state operations.
+- [x] Implement the Lambda handler entrypoint and event decoding for orchestration queue messages.
+- [x] Implement `ADD_TASKS` handling that inserts tasks and immediately dispatches newly runnable work.
+- [x] Implement `TASK_COMPLETED` handling that marks completion and dispatches newly unblocked tasks in the local/reference runtime.
+- [x] Implement retryable `TASK_ERROR` handling that increments attempts and redispatches work while retries remain.
+- [x] Define terminal-error behavior for `TASK_ERROR` events once `max_tries` is exhausted.
+- [x] Persist graph state to S3 after each accepted mutation.
+- [ ] Define unknown-task behavior: log and acknowledge invalid completion/error events as no-ops at the orchestrator boundary.
+- [ ] Define explicit behavior for duplicate `ADD_TASKS`, duplicate `TASK_COMPLETED`, duplicate `TASK_ERROR`, and other stale/no-op events in terms of Exorcist's current semantics.
+- [x] Ensure emitted `TaskMessage` payloads come from the shared Phase 1 message contracts.
+- [x] Keep task-type routing generic and driven by message content plus dispatch configuration.
+
+### Current Status
+
+The repo now contains a reusable local/reference orchestrator that already proves the core non-AWS execution model:
+
+- orchestration messages mutate graph state through the shared message-contract types rather than ad hoc handler logic
+- runnable work is emitted as `TaskMessage` payloads populated from taskdb state, including `task_type`, `task_details`, `graph_id`, and `attempt`
+- graph state is isolated by `graph_id`, and the current local backend reopens the same SQLite file or in-memory engine for subsequent events targeting that graph
+- Exorcist already treats retry exhaustion as a terminal `TOO_MANY_RETRIES` state rather than redispatching further work
+- duplicate `ADD_TASKS` remains invalid, duplicate `TASK_COMPLETED` is accepted as a no-op, and terminal retry exhaustion is covered; however, stale/unknown `TASK_ERROR` no-op handling is still blocked by an upstream Exorcist bug
+- reusable queue adapters exist for in-memory tests plus AWS SNS/SQS transports, and the Phase 2 Lambda path now decodes orchestration SQS event records directly while preserving the shared per-message orchestrator core
+- known upstream blocker: Exorcist's failure-transition path raises `NameError` on zero-row updates, so unknown or stale duplicate `TASK_ERROR` notifications do not yet cleanly ack as no-ops
 
 ### Definition of Done
 
 - The orchestrator handler deterministically processes supported message types and persists authoritative state after each accepted mutation.
 - Runnable tasks are emitted as valid `TaskMessage` payloads using the shared contract package.
-- Edge-case behavior is defined for duplicate, stale, or invalid graph events.
+- Edge-case behavior is defined for duplicate, stale, or invalid graph events, including the distinction between invalid duplicate `ADD_TASKS` and logged-and-acked stale terminal notifications.
 
 ### Tests
 
+- existing `pytest` coverage proves `ADD_TASKS`, `TASK_COMPLETED`, and retryable `TASK_ERROR` flows in the local/reference runtime
+- existing `pytest` coverage proves dependency unlocking, graph isolation by `graph_id`, task-attempt increments, and local SQLite reopen behavior
+- existing `pytest` coverage proves the shared SNS/SQS adapters preserve canonical JSON message bodies and publish the agreed AWS message attributes
 - `pytest` tests for `ADD_TASKS`, `TASK_COMPLETED`, and `TASK_ERROR` flows.
 - `pytest` tests for dependency unlocking and dispatch of newly runnable tasks.
-- `pytest` tests for duplicate completion/error events and other idempotency scenarios.
+- `pytest` tests for duplicate `TASK_COMPLETED`, stale/duplicate `TASK_ERROR`, duplicate `ADD_TASKS`, and other idempotency or invalid-event scenarios.
 - `pytest` tests for retry behavior, terminal error behavior, and no-runnable-task cases.
 - `pytest` tests that persistence and dispatch adapters are called with the expected payloads.
 
@@ -262,9 +301,9 @@ The main architectural point is that the shared task SNS topic can serve many ta
 - [ ] Create the `task-queue` Terraform module structure.
 - [ ] Provision one FIFO SQS queue plus one DLQ with redrive settings.
 - [ ] Add queue policy and subscription wiring from the shared task SNS topic.
-- [ ] Define and implement the message-filtering strategy for routing task types into the correct queue.
+- [ ] Implement task routing with SNS subscription filters on the shared `task_type` message attribute.
 - [ ] Expose queue URLs, ARNs, and any policy outputs required by compute modules.
-- [ ] Document any required SNS message attributes or payload conventions that upstream publishers must satisfy.
+- [ ] Wire the module to the established transport contract: canonical JSON message bodies plus shared `version`, `message_type`, and `task_type` AWS message attributes when present.
 - [ ] Add native `terraform test` coverage for both matching and non-matching task publications.
 
 ### Definition of Done
@@ -367,7 +406,7 @@ That keeps the website-facing code generic while still allowing each workflow to
 - [ ] Implement reusable request parsing around `InputsMessage`.
 - [ ] Validate the caller-provided `run_id` from `InputsMessage` and apply any output-location conventions used by the platform.
 - [ ] Implement construction of `OutputsMessage`, including output URL mappings and polling guidance.
-- [ ] Implement publishing of the initial orchestration message to the orchestration queue.
+- [ ] Implement publishing of the initial orchestration message to the orchestration queue, carrying `InputsMessage.run_id` as `OrchestrationMessage.graph_id`.
 - [ ] Define an adapter or protocol for workflow-specific graph construction.
 - [ ] Add a minimal generic example adapter used only for tests.
 - [ ] Keep all OpenFold/OpenFE-specific graph logic out of the reusable scaffold.

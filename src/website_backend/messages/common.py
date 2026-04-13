@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 __all__ = [
+    "CURRENT_CONTRACT_VERSION",
     "GraphId",
     "MessageModel",
     "NonEmptyStr",
@@ -13,6 +14,7 @@ __all__ = [
     "WorkflowName",
     "dump_message",
     "dump_message_json",
+    "validate_contract_version",
 ]
 
 from typing import Annotated, Any, TypeAlias, cast
@@ -28,6 +30,7 @@ TaskId = NonEmptyStr
 TaskType = NonEmptyStr
 OpaqueDetails: TypeAlias = dict[str, Any]
 UrlMap: TypeAlias = dict[NonEmptyStr, AnyUrl]
+CURRENT_CONTRACT_VERSION: Version = "2026.04"
 
 
 class MessageModel(BaseModel):
@@ -43,3 +46,11 @@ def dump_message(message: MessageModel) -> MessageDict:
 
 def dump_message_json(message: MessageModel) -> str:
     return message.model_dump_json()
+
+
+def validate_contract_version(version: Version) -> None:
+    if version != CURRENT_CONTRACT_VERSION:
+        raise ValueError(
+            "Message version does not match current contract version: "
+            f"{version!r} != {CURRENT_CONTRACT_VERSION!r}"
+        )

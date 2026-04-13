@@ -12,6 +12,7 @@ from __future__ import annotations
 __all__ = [
     "AddTasksDetails",
     "AddTasksMessage",
+    "CURRENT_CONTRACT_VERSION",
     "GraphId",
     "InputsMessage",
     "MessageModel",
@@ -33,6 +34,7 @@ __all__ = [
     "WorkflowName",
     "dump_message",
     "dump_message_json",
+    "validate_contract_version",
     "validate_inputs_message",
     "validate_orchestration_message",
     "validate_outputs_message",
@@ -40,6 +42,7 @@ __all__ = [
 ]
 
 from website_backend.messages.common import (
+    CURRENT_CONTRACT_VERSION,
     GraphId,
     MessageModel,
     NonEmptyStr,
@@ -52,6 +55,7 @@ from website_backend.messages.common import (
     WorkflowName,
     dump_message,
     dump_message_json,
+    validate_contract_version,
 )
 from website_backend.messages.inputs import InputsMessage, validate_inputs_message
 from website_backend.messages.orchestration import (
