@@ -5,11 +5,10 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic
 
 from website_backend.queues.protocols import InputQueue, OutputQueue, QueueDelivery
-
-MessageT = TypeVar("MessageT")
+from website_backend.queues.types import MessageT
 
 
 @dataclass(slots=True)

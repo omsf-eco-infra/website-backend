@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
-from typing import Any, TypeVar
+from collections.abc import Callable
+from typing import Any
 
 import boto3
 
 from website_backend.queues.aws_utils import derive_message_attributes
 from website_backend.queues.protocols import OutputQueue
-
-MessageT = TypeVar("MessageT")
-MessageAttributes = Mapping[str, Mapping[str, Any]]
+from website_backend.queues.types import AWSMessageAttributesMapping, MessageT
 
 
 class SNSQueue(OutputQueue[MessageT]):
@@ -25,7 +23,7 @@ class SNSQueue(OutputQueue[MessageT]):
     client : Any or None, default=None
         Optional SNS-compatible client. When omitted, a boto3 SNS client is
         created.
-    extra_message_attributes_getter : Callable[[MessageT], MessageAttributes] or None, default=None
+    extra_message_attributes_getter : Callable[[MessageT], AWSMessageAttributesMapping] or None, default=None
         Optional callable that returns additional AWS message attributes to add
         when publishing.
     subject_getter : Callable[[MessageT], str | None] or None, default=None
@@ -42,7 +40,9 @@ class SNSQueue(OutputQueue[MessageT]):
         topic_arn: str,
         message_encoder: Callable[[MessageT], str],
         client: Any | None = None,
-        extra_message_attributes_getter: Callable[[MessageT], MessageAttributes]
+        extra_message_attributes_getter: Callable[
+            [MessageT], AWSMessageAttributesMapping
+        ]
         | None = None,
         subject_getter: Callable[[MessageT], str | None] | None = None,
         message_group_id_getter: Callable[[MessageT], str | None] | None = None,
