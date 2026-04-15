@@ -53,17 +53,23 @@ variable "message_attributes_file" {
 }
 
 locals {
-  artifact_path = abspath("${var.artifacts_root}/${var.test_name}/${var.artifact_name}.json")
+  artifact_path                 = abspath("${var.artifacts_root}/${var.test_name}/${var.artifact_name}.json")
+  normalized_subject            = var.subject == null ? "" : var.subject
+  normalized_message_group_id   = var.message_group_id == null ? "" : var.message_group_id
+  normalized_message_dedup_id   = var.message_deduplication_id == null ? "" : var.message_deduplication_id
+  normalized_message_attrs_file = var.message_attributes_file == null ? "" : var.message_attributes_file
+  payload_sha1                  = fileexists(var.payload_file) ? filesha1(var.payload_file) : sha1(var.payload_file)
+  message_attributes_file_sha1  = local.normalized_message_attrs_file == "" ? "" : (fileexists(local.normalized_message_attrs_file) ? filesha1(local.normalized_message_attrs_file) : sha1(local.normalized_message_attrs_file))
 }
 
 resource "terraform_data" "publish" {
   triggers_replace = {
     topic_arn                = var.topic_arn
-    payload_sha1             = filesha1(var.payload_file)
-    subject                  = coalesce(var.subject, "")
-    message_group_id         = coalesce(var.message_group_id, "")
-    message_deduplication_id = coalesce(var.message_deduplication_id, "")
-    message_attributes_sha1  = var.message_attributes_file == null ? "" : filesha1(var.message_attributes_file)
+    payload_sha1             = local.payload_sha1
+    subject                  = local.normalized_subject
+    message_group_id         = local.normalized_message_group_id
+    message_deduplication_id = local.normalized_message_dedup_id
+    message_attributes_sha1  = local.message_attributes_file_sha1
     artifact_path            = local.artifact_path
   }
 
@@ -89,12 +95,12 @@ resource "terraform_data" "publish" {
     EOT
     environment = {
       ARTIFACT_PATH            = local.artifact_path
-      MESSAGE_ATTRIBUTES_FILE  = coalesce(var.message_attributes_file, "")
-      MESSAGE_DEDUPLICATION_ID = coalesce(var.message_deduplication_id, "")
-      MESSAGE_GROUP_ID         = coalesce(var.message_group_id, "")
+      MESSAGE_ATTRIBUTES_FILE  = local.normalized_message_attrs_file
+      MESSAGE_DEDUPLICATION_ID = local.normalized_message_dedup_id
+      MESSAGE_GROUP_ID         = local.normalized_message_group_id
       PAYLOAD_FILE             = var.payload_file
       PYTHON_EXECUTABLE        = var.python_executable
-      SUBJECT                  = coalesce(var.subject, "")
+      SUBJECT                  = local.normalized_subject
       TOPIC_ARN                = var.topic_arn
     }
   }

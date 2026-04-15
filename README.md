@@ -14,7 +14,7 @@ This repository is building reusable AWS workflow-platform components. Phase 0 l
 ## Naming conventions
 
 - Python imports stay under `website_backend.*`.
-- Terraform module directories stay hyphenated and match the public module names: `orchestration`, `task-queue`, `fargate-compute`, and `web-interface`.
+- Terraform module directories stay hyphenated and match the public module names: `container-image`, `lambda-deploy`, `orchestration`, `task-queue`, `fargate-compute`, and `web-interface`.
 - Lambda functions, ECR repositories, and example worker images use hyphenated role names derived from the component, for example `website-backend-orchestrator`, `website-backend-web-interface`, `website-backend-fargate-launcher`, and `website-backend-example-worker`.
 - Python helper modules use snake_case names under `website_backend.testing.*`.
 - Example payloads and test assets use snake_case family names plus dot-delimited scenarios, for example `inputs_message.valid.json` and `task_message.matching.json`.
@@ -108,13 +108,21 @@ pixi run -e dev tofu -chdir=tests/tf/orchestration init
 pixi run -e dev tofu -chdir=tests/tf/orchestration test -test-directory=.
 ```
 
+Run the real-AWS `fargate-compute` module test with sandbox AWS credentials configured in your shell:
+
+```bash
+pixi run -e dev tofu -chdir=tests/tf/fargate-compute init
+pixi run -e dev tofu -chdir=tests/tf/fargate-compute test -test-directory=.
+```
+
 Conventions:
 
 - `tests/tf/<module-name>/`: module-specific harness roots with OpenTofu configuration and `*.tftest.hcl` files
 - `tests/tf/support/modules/`: shared wrapper modules around `website_backend.testing.*`
 - `tests/tf/support/smoke/`: local smoke test for the helper harness pattern
 - `tests/tf/ci-smoke/`: real-AWS smoke test for the GitHub Actions Terraform path
-- `tests/tf/lambda-deploy/`: real-AWS module test for Lambda image build and ECR publication
+- `tests/tf/lambda-deploy/`: real-AWS module test for Lambda image build and ECR publication through `container-image`
+- `tests/tf/fargate-compute/`: real-AWS module test for the Fargate launcher and example worker path
 - `.tf-test-artifacts/`: ignored JSON artifacts written by mutating helper wrappers
 
 Helper rules:
@@ -124,7 +132,7 @@ Helper rules:
 - Successful helpers print exactly one JSON object to stdout.
 - Helpers write human diagnostics to stderr.
 - Read helpers support `--external-output`, which wraps their structured result as a JSON string for the OpenTofu `external` provider.
-- The shared harness does not publish Lambda images; image build/publish behavior remains part of the relevant Terraform modules.
+- The shared harness does not publish images; image build/publish behavior remains part of `container-image` and runtime-specific wrappers such as `lambda-deploy`.
 
 ## GitHub Actions
 
