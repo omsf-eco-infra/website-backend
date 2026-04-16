@@ -139,7 +139,7 @@ Helper rules:
 This repo now carries two GitHub Actions workflows:
 
 - `Pytest`: runs the Python test suite on pull requests and pushes to `main`
-- `Terraform`: runs the local OpenTofu support smoke test on every pull request plus the real-AWS `ci-smoke` and `lambda-deploy` jobs for same-repo pull requests, pushes to `main`, and manual runs on `main`
+- `Terraform`: runs the local OpenTofu support smoke test on every pull request plus the real-AWS `ci-smoke`, `lambda-deploy`, `orchestration`, and `fargate-compute` jobs for same-repo pull requests, pushes to `main`, and manual runs on `main`
 
 The AWS-backed workflow uses these repository secrets:
 
