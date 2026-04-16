@@ -66,7 +66,7 @@ locals {
 
 resource "aws_ecr_repository" "this" {
   name                 = var.repository_name
-  force_delete         = true
+  force_delete         = var.force_delete
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
