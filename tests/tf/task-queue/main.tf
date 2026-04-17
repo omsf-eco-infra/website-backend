@@ -194,14 +194,16 @@ module "redrive_attributes_artifact" {
 module "publish_matching" {
   source = "../support/modules/publish-sns-message"
 
-  artifacts_root           = local.artifacts_root
-  test_name                = local.test_name
-  artifact_name            = "publish-matching"
-  topic_arn                = aws_sns_topic.tasks.arn
-  payload_file             = module.matching_payload_artifact.artifact_path
-  message_group_id         = local.matching_graph_id
-  message_deduplication_id = "${local.run_id}-matching"
-  message_attributes_file  = module.matching_attributes_artifact.artifact_path
+  artifacts_root                  = local.artifacts_root
+  test_name                       = local.test_name
+  artifact_name                   = "publish-matching"
+  topic_arn                       = aws_sns_topic.tasks.arn
+  payload_file                    = module.matching_payload_artifact.artifact_path
+  payload_content_sha1            = module.matching_payload_artifact.content_sha1
+  message_group_id                = local.matching_graph_id
+  message_deduplication_id        = "${local.run_id}-matching"
+  message_attributes_file         = module.matching_attributes_artifact.artifact_path
+  message_attributes_content_sha1 = module.matching_attributes_artifact.content_sha1
 
   depends_on = [module.module_under_test]
 }
@@ -209,14 +211,16 @@ module "publish_matching" {
 module "publish_non_matching" {
   source = "../support/modules/publish-sns-message"
 
-  artifacts_root           = local.artifacts_root
-  test_name                = local.test_name
-  artifact_name            = "publish-non-matching"
-  topic_arn                = aws_sns_topic.tasks.arn
-  payload_file             = module.non_matching_payload_artifact.artifact_path
-  message_group_id         = local.non_matching_graph_id
-  message_deduplication_id = "${local.run_id}-non-matching"
-  message_attributes_file  = module.non_matching_attributes_artifact.artifact_path
+  artifacts_root                  = local.artifacts_root
+  test_name                       = local.test_name
+  artifact_name                   = "publish-non-matching"
+  topic_arn                       = aws_sns_topic.tasks.arn
+  payload_file                    = module.non_matching_payload_artifact.artifact_path
+  payload_content_sha1            = module.non_matching_payload_artifact.content_sha1
+  message_group_id                = local.non_matching_graph_id
+  message_deduplication_id        = "${local.run_id}-non-matching"
+  message_attributes_file         = module.non_matching_attributes_artifact.artifact_path
+  message_attributes_content_sha1 = module.non_matching_attributes_artifact.content_sha1
 
   depends_on = [module.publish_matching]
 }
@@ -247,14 +251,16 @@ module "check_empty_after_filter" {
 module "publish_redrive" {
   source = "../support/modules/publish-sns-message"
 
-  artifacts_root           = local.artifacts_root
-  test_name                = local.test_name
-  artifact_name            = "publish-redrive"
-  topic_arn                = aws_sns_topic.tasks.arn
-  payload_file             = module.redrive_payload_artifact.artifact_path
-  message_group_id         = local.redrive_graph_id
-  message_deduplication_id = "${local.run_id}-redrive"
-  message_attributes_file  = module.redrive_attributes_artifact.artifact_path
+  artifacts_root                  = local.artifacts_root
+  test_name                       = local.test_name
+  artifact_name                   = "publish-redrive"
+  topic_arn                       = aws_sns_topic.tasks.arn
+  payload_file                    = module.redrive_payload_artifact.artifact_path
+  payload_content_sha1            = module.redrive_payload_artifact.content_sha1
+  message_group_id                = local.redrive_graph_id
+  message_deduplication_id        = "${local.run_id}-redrive"
+  message_attributes_file         = module.redrive_attributes_artifact.artifact_path
+  message_attributes_content_sha1 = module.redrive_attributes_artifact.content_sha1
 
   depends_on = [module.check_empty_after_filter]
 }

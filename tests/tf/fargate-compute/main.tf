@@ -209,14 +209,16 @@ module "attributes_artifact" {
 module "publish_task" {
   source = "../support/modules/publish-sns-message"
 
-  artifacts_root           = local.artifacts_root
-  test_name                = local.test_name
-  artifact_name            = "publish-task"
-  topic_arn                = aws_sns_topic.tasks.arn
-  payload_file             = module.payload_artifact.artifact_path
-  message_group_id         = local.task_payload.graph_id
-  message_deduplication_id = "${local.run_id}-task-hello"
-  message_attributes_file  = module.attributes_artifact.artifact_path
+  artifacts_root                  = local.artifacts_root
+  test_name                       = local.test_name
+  artifact_name                   = "publish-task"
+  topic_arn                       = aws_sns_topic.tasks.arn
+  payload_file                    = module.payload_artifact.artifact_path
+  payload_content_sha1            = module.payload_artifact.content_sha1
+  message_group_id                = local.task_payload.graph_id
+  message_deduplication_id        = "${local.run_id}-task-hello"
+  message_attributes_file         = module.attributes_artifact.artifact_path
+  message_attributes_content_sha1 = module.attributes_artifact.content_sha1
 
   depends_on = [
     module.task_queue,
