@@ -8,8 +8,9 @@ SNS topic:
 - one worker task role plus one worker execution role
 - one CloudWatch Logs group for the worker container
 - one image-based launcher Lambda built through `modules/lambda-deploy`
-- one SNS subscription that routes matching `task_type` values into the
-  launcher Lambda
+- one FIFO SQS launcher queue subscribed to the task topic
+- one Lambda event-source mapping that routes matching `task_type` values from
+  the launcher queue into the launcher Lambda
 
 The module stays generic at the worker boundary. Callers provide the worker
 container image URI, usually from `modules/container-image`, plus the task queue
@@ -79,6 +80,9 @@ Derived resource names:
 - The launcher Lambda environment matches the Phase 5 Python contract exactly:
   `ECS_CLUSTER_ARN`, `ECS_TASK_DEFINITION_ARN`, `ECS_CONTAINER_NAME`,
   `SUBNET_IDS`, `SECURITY_GROUP_IDS`, and `ASSIGN_PUBLIC_IP`.
+- Because the shared task topic is FIFO, the launcher Lambda is fed through a
+  dedicated FIFO SQS subscription queue rather than a direct SNS-to-Lambda
+  subscription.
 - The worker task definition always includes `WORKFLOW_NAME` and
   `TASK_QUEUE_URL`; task-specific values stay launch-time-only and are injected
   by the launcher through ECS container overrides.

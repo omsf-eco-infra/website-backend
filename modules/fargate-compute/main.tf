@@ -1,13 +1,15 @@
 data "aws_region" "current" {}
 
 locals {
-  cluster_name            = "${var.name_prefix}-cluster"
-  task_definition_family  = "${var.name_prefix}-worker"
-  worker_log_group_name   = "/aws/ecs/${var.name_prefix}-worker"
-  launcher_function_name  = "${var.name_prefix}-fargate-launcher"
-  launcher_log_group_name = "/aws/lambda/${local.launcher_function_name}"
-  log_retention_days      = 14
-  task_types              = [for task_type in var.task_types : trimspace(task_type)]
+  cluster_name                        = "${var.name_prefix}-cluster"
+  task_definition_family              = "${var.name_prefix}-worker"
+  worker_log_group_name               = "/aws/ecs/${var.name_prefix}-worker"
+  launcher_function_name              = "${var.name_prefix}-fargate-launcher"
+  launcher_queue_name                 = "${var.name_prefix}-launcher.fifo"
+  launcher_log_group_name             = "/aws/lambda/${local.launcher_function_name}"
+  log_retention_days                  = 14
+  launcher_visibility_timeout_seconds = max(var.launcher_timeout * 6, 60)
+  task_types                          = [for task_type in var.task_types : trimspace(task_type)]
   worker_environment = merge(
     var.worker_environment,
     {
@@ -50,6 +52,39 @@ resource "aws_cloudwatch_log_group" "launcher" {
   name              = local.launcher_log_group_name
   retention_in_days = local.log_retention_days
   tags              = var.tags
+}
+
+resource "aws_sqs_queue" "launcher" {
+  name                        = local.launcher_queue_name
+  fifo_queue                  = true
+  content_based_deduplication = true
+  visibility_timeout_seconds  = local.launcher_visibility_timeout_seconds
+  tags                        = var.tags
+}
+
+data "aws_iam_policy_document" "launcher_queue" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["sns.amazonaws.com"]
+    }
+
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.launcher.arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [var.task_topic_arn]
+    }
+  }
+}
+
+resource "aws_sqs_queue_policy" "launcher" {
+  queue_url = aws_sqs_queue.launcher.id
+  policy    = data.aws_iam_policy_document.launcher_queue.json
 }
 
 data "aws_iam_policy_document" "ecs_tasks_assume_role" {
@@ -187,6 +222,18 @@ data "aws_iam_policy_document" "launcher" {
       aws_iam_role.worker_task.arn,
     ]
   }
+
+  statement {
+    sid    = "AllowLauncherQueueConsume"
+    effect = "Allow"
+    actions = [
+      "sqs:ChangeMessageVisibility",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:ReceiveMessage",
+    ]
+    resources = [aws_sqs_queue.launcher.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "launcher" {
@@ -224,21 +271,21 @@ resource "aws_lambda_function" "launcher" {
   tags = var.tags
 }
 
-resource "aws_lambda_permission" "task_topic" {
-  statement_id  = "AllowExecutionFromTaskTopic"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.launcher.function_name
-  principal     = "sns.amazonaws.com"
-  source_arn    = var.task_topic_arn
-}
-
 resource "aws_sns_topic_subscription" "launcher" {
-  topic_arn = var.task_topic_arn
-  protocol  = "lambda"
-  endpoint  = aws_lambda_function.launcher.arn
+  topic_arn            = var.task_topic_arn
+  protocol             = "sqs"
+  endpoint             = aws_sqs_queue.launcher.arn
+  raw_message_delivery = true
   filter_policy = jsonencode({
     task_type = local.task_types
   })
 
-  depends_on = [aws_lambda_permission.task_topic]
+  depends_on = [aws_sqs_queue_policy.launcher]
+}
+
+resource "aws_lambda_event_source_mapping" "launcher" {
+  event_source_arn = aws_sqs_queue.launcher.arn
+  function_name    = aws_lambda_function.launcher.arn
+  batch_size       = 1
+  enabled          = true
 }

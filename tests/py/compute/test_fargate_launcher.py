@@ -11,12 +11,12 @@ from website_backend.compute import (
     FargateLauncherConfig,
     build_run_task_request,
     build_worker_environment_overrides,
-    decode_sns_task_message,
+    decode_sqs_task_message,
     launch_task_for_message,
     load_fargate_launcher_config,
     process_task_available_event,
     task_message_client_token,
-    validate_sns_lambda_event,
+    validate_sqs_lambda_event,
 )
 from website_backend.messages import CURRENT_CONTRACT_VERSION
 from website_backend.messages import TaskMessage
@@ -40,15 +40,14 @@ def _task_message(
     )
 
 
-def _sns_event_for(message: TaskMessage) -> dict[str, object]:
+def _sqs_event_for(message: TaskMessage) -> dict[str, object]:
     return {
         "Records": [
             {
-                "EventSource": "aws:sns",
-                "Sns": {
-                    "MessageId": "message-123",
-                    "Message": message.model_dump_json(),
-                },
+                "eventSource": "aws:sqs",
+                "messageId": "message-123",
+                "receiptHandle": "receipt-123",
+                "body": message.model_dump_json(),
             }
         ]
     }
@@ -139,58 +138,55 @@ class TestLoadFargateLauncherConfig:
             )
 
 
-class TestDecodeSnsTaskMessage:
-    def test_validate_sns_lambda_event_returns_sns_payload(self) -> None:
+class TestDecodeSqsTaskMessage:
+    def test_validate_sqs_lambda_event_returns_sqs_record(self) -> None:
         message = _task_message()
 
-        sns_record = validate_sns_lambda_event(_sns_event_for(message))
+        sqs_record = validate_sqs_lambda_event(_sqs_event_for(message))
 
-        assert sns_record["Message"] == message.model_dump_json()
+        assert sqs_record["body"] == message.model_dump_json()
 
-    def test_decodes_single_sns_record(self) -> None:
+    def test_decodes_single_sqs_record(self) -> None:
         message = _task_message()
 
-        decoded = decode_sns_task_message(_sns_event_for(message))
+        decoded = decode_sqs_task_message(_sqs_event_for(message))
 
         assert decoded == message
 
-    def test_validate_sns_lambda_event_rejects_non_single_record_event(self) -> None:
+    def test_validate_sqs_lambda_event_rejects_non_single_record_event(self) -> None:
         with pytest.raises(
             ValueError,
-            match="Expected exactly one SNS record from the task topic trigger",
+            match="Expected exactly one SQS record from the task topic trigger",
         ):
-            validate_sns_lambda_event({"Records": []})
+            validate_sqs_lambda_event({"Records": []})
 
-    def test_validate_sns_lambda_event_rejects_wrong_event_source(self) -> None:
+    def test_validate_sqs_lambda_event_rejects_wrong_event_source(self) -> None:
         message = _task_message()
-        event = _sns_event_for(message)
-        event["Records"][0]["EventSource"] = "aws:sqs"
+        event = _sqs_event_for(message)
+        event["Records"][0]["eventSource"] = "aws:sns"
 
-        with pytest.raises(ValueError, match="Expected an SNS Lambda event record"):
-            validate_sns_lambda_event(event)
+        with pytest.raises(ValueError, match="Expected an SQS Lambda event record"):
+            validate_sqs_lambda_event(event)
 
-    def test_validate_sns_lambda_event_rejects_non_mapping_record(self) -> None:
-        with pytest.raises(ValueError, match="Expected an SNS Lambda event record"):
-            validate_sns_lambda_event({"Records": ["bad-record"]})
+    def test_validate_sqs_lambda_event_rejects_non_mapping_record(self) -> None:
+        with pytest.raises(ValueError, match="Expected an SQS Lambda event record"):
+            validate_sqs_lambda_event({"Records": ["bad-record"]})
 
-    def test_validate_sns_lambda_event_rejects_missing_sns_payload(self) -> None:
-        with pytest.raises(ValueError, match="missing Sns payload"):
-            validate_sns_lambda_event({"Records": [{"EventSource": "aws:sns"}]})
-
-    def test_rejects_missing_sns_message(self) -> None:
-        with pytest.raises(ValueError, match="missing Sns.Message"):
-            decode_sns_task_message(
-                {"Records": [{"EventSource": "aws:sns", "Sns": {}}]}
+    def test_rejects_missing_sqs_body(self) -> None:
+        with pytest.raises(ValueError, match="missing body"):
+            decode_sqs_task_message(
+                {"Records": [{"eventSource": "aws:sqs", "receiptHandle": "receipt"}]}
             )
 
     def test_rejects_invalid_json_body(self) -> None:
-        with pytest.raises(ValueError, match="invalid JSON message body"):
-            decode_sns_task_message(
+        with pytest.raises(ValueError, match="invalid JSON body"):
+            decode_sqs_task_message(
                 {
                     "Records": [
                         {
-                            "EventSource": "aws:sns",
-                            "Sns": {"Message": "{not-json"},
+                            "eventSource": "aws:sqs",
+                            "receiptHandle": "receipt",
+                            "body": "{not-json",
                         }
                     ]
                 }
@@ -198,12 +194,13 @@ class TestDecodeSnsTaskMessage:
 
     def test_rejects_invalid_task_message(self) -> None:
         with pytest.raises(ValidationError):
-            decode_sns_task_message(
+            decode_sqs_task_message(
                 {
                     "Records": [
                         {
-                            "EventSource": "aws:sns",
-                            "Sns": {"Message": json.dumps({"task_id": "task-1"})},
+                            "eventSource": "aws:sqs",
+                            "receiptHandle": "receipt",
+                            "body": json.dumps({"task_id": "task-1"}),
                         }
                     ]
                 }
@@ -211,7 +208,7 @@ class TestDecodeSnsTaskMessage:
 
     def test_rejects_contract_version_mismatch(self) -> None:
         with pytest.raises(ValueError, match="current contract version"):
-            decode_sns_task_message(_sns_event_for(_task_message(version="1776.07")))
+            decode_sqs_task_message(_sqs_event_for(_task_message(version="1776.07")))
 
 
 class TestRunTaskRequest:
@@ -304,7 +301,7 @@ class TestLaunchTaskForMessage:
         message = _task_message(attempt=2)
 
         response = process_task_available_event(
-            _sns_event_for(message),
+            _sqs_event_for(message),
             config=config,
             ecs_client=ecs,
         )
