@@ -78,12 +78,19 @@ Run the GitHub Actions real-AWS smoke test with sandbox AWS credentials configur
 pixi run -e dev test-tf-ci-smoke
 ```
 
+Run the real-AWS `lambda-deploy` module test with sandbox AWS credentials configured in your shell:
+
+```bash
+pixi run -e dev test-tf-lambda-deploy
+```
+
 Conventions:
 
 - `tests/tf/<module-name>/`: module-specific harness roots with OpenTofu configuration and `*.tftest.hcl` files
 - `tests/tf/support/modules/`: shared wrapper modules around `website_backend.testing.*`
 - `tests/tf/support/smoke/`: local smoke test for the helper harness pattern
 - `tests/tf/ci-smoke/`: real-AWS smoke test for the GitHub Actions Terraform path
+- `tests/tf/lambda-deploy/`: real-AWS module test for Lambda image build and ECR publication
 - `.tf-test-artifacts/`: ignored JSON artifacts written by mutating helper wrappers
 
 Helper rules:
@@ -100,7 +107,7 @@ Helper rules:
 This repo now carries two GitHub Actions workflows:
 
 - `Pytest`: runs the Python test suite on pull requests and pushes to `main`
-- `Terraform`: runs the local OpenTofu support smoke test on every pull request plus a real-AWS ci-smoke job for same-repo pull requests, pushes to `main`, and manual runs on `main`
+- `Terraform`: runs the local OpenTofu support smoke test on every pull request plus the real-AWS `ci-smoke` and `lambda-deploy` jobs for same-repo pull requests, pushes to `main`, and manual runs on `main`
 
 The AWS-backed workflow uses these repository secrets:
 
