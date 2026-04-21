@@ -1,10 +1,25 @@
 from __future__ import annotations
 
 import boto3
+import pytest
+from botocore.exceptions import ClientError
 from moto import mock_aws
 
 from website_backend.orchestration.taskdb import TaskStatusDB
 from website_backend.testing import inspect_taskdb_snapshot
+
+
+def _write_taskdb(path, *task_ids: str) -> None:
+    taskdb = TaskStatusDB.from_filename(path)
+    for task_id in task_ids:
+        taskdb.add_task(
+            taskid=task_id,
+            task_type="example_task",
+            task_details={"task_id": task_id},
+            requirements=[],
+            max_tries=1,
+        )
+    taskdb.engine.dispose()
 
 
 @mock_aws
@@ -117,3 +132,88 @@ def test_inspect_taskdb_snapshot_returns_current_state_when_etag_does_not_change
     assert result["exists"] is True
     assert result["etag"] == response["ETag"]
     assert result["task_ids"] == ["task-a"]
+
+
+class AccessDeniedHeadClient:
+    def head_object(self, *, Bucket, Key):  # noqa: N803
+        del Bucket, Key
+        raise ClientError(
+            {"Error": {"Code": "AccessDenied", "Message": "denied"}},
+            "HeadObject",
+        )
+
+
+def test_inspect_taskdb_snapshot_reraises_unexpected_head_errors() -> None:
+    with pytest.raises(ClientError) as excinfo:
+        inspect_taskdb_snapshot.inspect_snapshot(
+            bucket="example-bucket",
+            key="runs/run-123/taskdb.sqlite",
+            timeout_seconds=1,
+            poll_interval_seconds=0,
+            client=AccessDeniedHeadClient(),
+        )
+
+    assert excinfo.value.response["Error"]["Code"] == "AccessDenied"
+
+
+@mock_aws
+def test_inspect_taskdb_snapshot_waits_for_missing_key_to_appear(tmp_path) -> None:
+    bucket = "example-bucket"
+    key = "runs/run-123/taskdb.sqlite"
+
+    db_path = tmp_path / "taskdb.sqlite"
+    _write_taskdb(db_path, "task-a")
+
+    s3 = boto3.client("s3", region_name="us-east-1")
+    s3.create_bucket(Bucket=bucket)
+
+    def upload_snapshot(_seconds: int) -> None:
+        s3.put_object(Bucket=bucket, Key=key, Body=db_path.read_bytes())
+
+    result = inspect_taskdb_snapshot.inspect_snapshot(
+        bucket=bucket,
+        key=key,
+        timeout_seconds=1,
+        poll_interval_seconds=0,
+        client=s3,
+        sleeper=upload_snapshot,
+    )
+
+    assert result["exists"] is True
+    assert result["task_ids"] == ["task-a"]
+
+
+@mock_aws
+def test_inspect_taskdb_snapshot_waits_for_etag_to_change(tmp_path) -> None:
+    bucket = "example-bucket"
+    key = "runs/run-123/taskdb.sqlite"
+
+    initial_db_path = tmp_path / "initial.sqlite"
+    updated_db_path = tmp_path / "updated.sqlite"
+    _write_taskdb(initial_db_path, "task-a")
+    _write_taskdb(updated_db_path, "task-a", "task-b")
+
+    s3 = boto3.client("s3", region_name="us-east-1")
+    s3.create_bucket(Bucket=bucket)
+    initial_response = s3.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=initial_db_path.read_bytes(),
+    )
+
+    def upload_updated_snapshot(_seconds: int) -> None:
+        s3.put_object(Bucket=bucket, Key=key, Body=updated_db_path.read_bytes())
+
+    result = inspect_taskdb_snapshot.inspect_snapshot(
+        bucket=bucket,
+        key=key,
+        previous_etag=initial_response["ETag"],
+        timeout_seconds=1,
+        poll_interval_seconds=0,
+        client=s3,
+        sleeper=upload_updated_snapshot,
+    )
+
+    assert result["exists"] is True
+    assert result["etag"] != initial_response["ETag"]
+    assert result["task_ids"] == ["task-a", "task-b"]
