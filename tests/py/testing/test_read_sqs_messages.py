@@ -41,6 +41,41 @@ def test_read_sqs_messages_returns_raw_sqs_message_payload() -> None:
     }
 
 
+@mock_aws
+def test_read_sqs_messages_optionally_deletes_messages_after_read() -> None:
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    queue_url = sqs.create_queue(
+        QueueName="example.fifo",
+        Attributes={
+            "FifoQueue": "true",
+            "ContentBasedDeduplication": "false",
+            "VisibilityTimeout": "0",
+        },
+    )["QueueUrl"]
+    sqs.send_message(
+        QueueUrl=queue_url,
+        MessageBody=json.dumps({"result": "ok"}),
+        MessageGroupId="group-1",
+        MessageDeduplicationId="dedupe-1",
+    )
+
+    result = read_sqs_messages.read_messages(
+        queue_url=queue_url,
+        delete_after_read=True,
+        timeout_seconds=1,
+        poll_interval_seconds=0,
+        client=sqs,
+    )
+
+    assert result["message_count"] == 1
+    follow_up = sqs.receive_message(
+        QueueUrl=queue_url,
+        MaxNumberOfMessages=1,
+        WaitTimeSeconds=0,
+    )
+    assert follow_up.get("Messages") is None
+
+
 def test_read_sqs_messages_clamps_long_poll_to_remaining_timeout() -> None:
     wait_times: list[int] = []
 

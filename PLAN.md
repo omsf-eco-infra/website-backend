@@ -274,14 +274,14 @@ To keep later Lambda-bearing modules consistent, this phase also establishes a s
 - [x] Make `lambda-deploy` create an ECR repository, build and push the Lambda image from local code, and output a digest-pinned image URI.
 - [x] Make `lambda-deploy` hash the caller-selected source paths so OpenTofu rebuilds the image when the Lambda source or shared runtime code changes.
 - [x] Add native `terraform test` coverage for `lambda-deploy` using the example orchestrator Lambda Dockerfile layout in `modules/orchestration/lambda/`.
-- [ ] Create the `orchestration` Terraform module structure.
-- [ ] Define inputs for the orchestration queue, shared task topic behavior, state-store bucket/key configuration, and tagging.
-- [ ] Provision the orchestration SQS queue, orchestrator Lambda, IAM permissions, log group, and SNS topic integration required by the architecture.
-- [ ] Wire the module to instantiate `lambda-deploy` and deploy the Phase 2 Lambda image.
-- [ ] Expose outputs required by downstream `task-queue` and `web-interface` modules.
-- [ ] Define how the orchestration module passes its Dockerfile, build context, and source-hash inputs into `lambda-deploy` during tests and deployments.
-- [ ] Add native `terraform test` coverage that publishes a sample orchestration message into AWS.
-- [ ] Assert that the deployed Lambda runs, publishes task output onto the shared task topic, and persists graph state to the configured store.
+- [x] Create the `orchestration` Terraform module structure.
+- [x] Define inputs for the orchestration queue, shared task topic behavior, state-store bucket/key configuration, and tagging.
+- [x] Provision the orchestration SQS queue, orchestrator Lambda, IAM permissions, log group, and SNS topic integration required by the architecture.
+- [x] Wire the module to instantiate `lambda-deploy` and deploy the Phase 2 Lambda image.
+- [x] Expose outputs required by downstream `task-queue` and `web-interface` modules.
+- [x] Define how the orchestration module passes its Dockerfile, build context, and source-hash inputs into `lambda-deploy` during tests and deployments.
+- [x] Add native `terraform test` coverage that publishes a sample orchestration message into AWS.
+- [x] Assert that the deployed Lambda runs, publishes task output onto the shared task topic, and persists graph state to the configured store.
 
 ### Definition of Done
 

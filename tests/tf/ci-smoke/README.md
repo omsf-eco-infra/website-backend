@@ -10,7 +10,8 @@ wrapper, and asserts the round-trip result with native `tofu test`.
 Run it with sandbox AWS credentials available in the environment:
 
 ```bash
-pixi run -e dev test-tf-ci-smoke
+pixi run -e dev tofu -chdir=tests/tf/ci-smoke init
+pixi run -e dev tofu -chdir=tests/tf/ci-smoke test -test-directory=.
 ```
 
 Optional variables:

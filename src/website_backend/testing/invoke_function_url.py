@@ -15,7 +15,7 @@ from website_backend.testing.common import (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     """Build the CLI parser for Function URL invocation.
 
     Returns
@@ -94,7 +94,7 @@ def invoke_function_url(
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run the Function URL helper as a CLI program.
 
     Parameters
@@ -120,5 +120,5 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
