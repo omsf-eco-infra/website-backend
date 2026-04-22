@@ -13,7 +13,7 @@ from website_backend.testing.common import (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     """Build the CLI parser for driving SQS redrive behavior."""
     parser = argparse.ArgumentParser(
         description="Receive from SQS until the message drains from the source queue.",
@@ -110,7 +110,7 @@ def exercise_redrive(
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run the SQS redrive helper as a CLI program."""
     args = build_parser().parse_args(argv)
     result = exercise_redrive(
@@ -126,5 +126,5 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
