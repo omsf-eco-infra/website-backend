@@ -15,7 +15,7 @@ from website_backend.testing.common import (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     """Build the CLI parser for S3 object reads.
 
     Returns
@@ -112,7 +112,7 @@ def read_object(
             sleeper(poll_interval_seconds)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run the S3 object reader as a CLI program.
 
     Parameters
@@ -136,5 +136,5 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

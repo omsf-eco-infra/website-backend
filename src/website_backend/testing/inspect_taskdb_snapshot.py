@@ -19,7 +19,7 @@ from website_backend.testing.common import (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     """Build the CLI parser for taskdb snapshot inspection."""
     parser = argparse.ArgumentParser(
         description="Inspect a taskdb SQLite snapshot in S3."
@@ -156,7 +156,7 @@ def inspect_snapshot(
         return summary
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     """Run the taskdb snapshot inspector as a CLI program."""
     args = build_parser().parse_args(argv)
     result = inspect_snapshot(
@@ -170,5 +170,5 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

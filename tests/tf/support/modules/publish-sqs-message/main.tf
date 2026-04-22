@@ -50,7 +50,9 @@ variable "message_deduplication_id" {
 
 locals {
   artifact_path = abspath("${var.artifacts_root}/${var.test_name}/${var.artifact_name}.json")
-  payload_sha1  = var.payload != null ? sha1(var.payload) : filesha1(var.payload_file)
+  payload_sha1 = var.payload != null ? sha1(var.payload) : (
+    var.payload_file != null ? filesha1(var.payload_file) : null
+  )
 }
 
 resource "terraform_data" "publish" {

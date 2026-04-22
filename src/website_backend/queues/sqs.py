@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping
-from typing import Any, TypeVar
+from typing import Any
 
 import boto3
 
 from website_backend.queues.aws_utils import derive_message_attributes
 from website_backend.queues.protocols import InputQueue, OutputQueue, QueueDelivery
-
-MessageT = TypeVar("MessageT")
-MessageAttributes = Mapping[str, Mapping[str, Any]]
+from website_backend.queues.types import (
+    AWSMessageAttributesMapping,
+    MessageT,
+    SQSDeliveryFields,
+)
 
 
 def decode_sqs_delivery(
-    message: Mapping[str, Any],
+    message: SQSDeliveryFields,
     *,
     message_decoder: Callable[[Any], MessageT],
     body_field: str = "Body",
@@ -91,7 +93,7 @@ class SQSQueue(InputQueue[MessageT], OutputQueue[MessageT]):
         Long-poll wait time used by `get_message`.
     visibility_timeout : int or None, default=None
         Optional visibility timeout override applied to `get_message`.
-    extra_message_attributes_getter : Callable[[MessageT], MessageAttributes] or None, default=None
+    extra_message_attributes_getter : Callable[[MessageT], AWSMessageAttributesMapping] or None, default=None
         Optional callable that returns additional AWS message attributes to add
         when publishing.
     message_group_id_getter : Callable[[MessageT], str | None] or None, default=None
@@ -109,7 +111,9 @@ class SQSQueue(InputQueue[MessageT], OutputQueue[MessageT]):
         client: Any | None = None,
         wait_time_seconds: int = 0,
         visibility_timeout: int | None = None,
-        extra_message_attributes_getter: Callable[[MessageT], MessageAttributes]
+        extra_message_attributes_getter: Callable[
+            [MessageT], AWSMessageAttributesMapping
+        ]
         | None = None,
         message_group_id_getter: Callable[[MessageT], str | None] | None = None,
         message_deduplication_id_getter: Callable[[MessageT], str | None] | None = None,
