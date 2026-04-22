@@ -29,9 +29,9 @@ locals {
   created_at      = timestamp()
   expires_at      = timeadd(local.created_at, "24h")
 
-  name_prefix    = "wb-orch-${local.owner_sanitized}-${local.run_suffix}"
-  graph_id       = "runs/${local.run_id}/taskdb.sqlite"
-  observer_queue = "${local.name_prefix}-observer.fifo"
+  name_prefix          = "wb-orch-${local.owner_sanitized}-${local.run_suffix}"
+  graph_id             = "runs/${local.run_id}/taskdb.sqlite"
+  observer_name_prefix = "${local.name_prefix}-observer"
 
   contract_version = jsondecode(
     file("${local.repo_root}/examples/payloads/orchestration_message.add_tasks.valid.json")
@@ -120,46 +120,17 @@ module "module_under_test" {
   tags = local.common_tags
 }
 
-resource "aws_sqs_queue" "observer" {
-  name                        = local.observer_queue
-  fifo_queue                  = true
-  content_based_deduplication = true
+module "observer" {
+  source = "../../../modules/task-queue"
 
+  name_prefix    = local.observer_name_prefix
+  task_topic_arn = module.module_under_test.task_topic_arn
+  task_types = [
+    "prepare_inputs",
+    "stage_inputs",
+    "collect_outputs",
+  ]
   tags = local.common_tags
-}
-
-data "aws_iam_policy_document" "observer_queue" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      type        = "Service"
-      identifiers = ["sns.amazonaws.com"]
-    }
-
-    actions   = ["sqs:SendMessage"]
-    resources = [aws_sqs_queue.observer.arn]
-
-    condition {
-      test     = "ArnEquals"
-      variable = "aws:SourceArn"
-      values   = [module.module_under_test.task_topic_arn]
-    }
-  }
-}
-
-resource "aws_sqs_queue_policy" "observer" {
-  queue_url = aws_sqs_queue.observer.id
-  policy    = data.aws_iam_policy_document.observer_queue.json
-}
-
-resource "aws_sns_topic_subscription" "observer" {
-  topic_arn            = module.module_under_test.task_topic_arn
-  protocol             = "sqs"
-  endpoint             = aws_sqs_queue.observer.arn
-  raw_message_delivery = true
-
-  depends_on = [aws_sqs_queue_policy.observer]
 }
 
 module "publish_add_tasks" {
@@ -174,7 +145,7 @@ module "publish_add_tasks" {
   message_deduplication_id = "${local.run_id}-add-tasks"
 
   depends_on = [
-    aws_sns_topic_subscription.observer,
+    module.observer,
     module.module_under_test,
   ]
 }
@@ -193,7 +164,7 @@ module "inspect_initial_snapshot" {
 module "read_initial_messages" {
   source = "../support/modules/read-sqs-messages"
 
-  queue_url             = aws_sqs_queue.observer.id
+  queue_url             = module.observer.task_queue_url
   min_message_count     = 2
   timeout_seconds       = 180
   poll_interval_seconds = 2
@@ -205,7 +176,7 @@ module "read_initial_messages" {
 module "check_empty_after_initial_fanout" {
   source = "../support/modules/read-sqs-messages"
 
-  queue_url             = aws_sqs_queue.observer.id
+  queue_url             = module.observer.task_queue_url
   timeout_seconds       = 10
   poll_interval_seconds = 1
   wait_time_seconds     = 2
@@ -244,7 +215,7 @@ module "inspect_after_task_a_snapshot" {
 module "check_empty_after_task_a" {
   source = "../support/modules/read-sqs-messages"
 
-  queue_url             = aws_sqs_queue.observer.id
+  queue_url             = module.observer.task_queue_url
   timeout_seconds       = 10
   poll_interval_seconds = 1
   wait_time_seconds     = 2
@@ -283,7 +254,7 @@ module "inspect_final_snapshot" {
 module "read_final_message" {
   source = "../support/modules/read-sqs-messages"
 
-  queue_url             = aws_sqs_queue.observer.id
+  queue_url             = module.observer.task_queue_url
   min_message_count     = 1
   timeout_seconds       = 180
   poll_interval_seconds = 2

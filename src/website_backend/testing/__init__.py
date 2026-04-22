@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = [
     "common",
+    "exercise_sqs_redrive",
     "inspect_taskdb_snapshot",
     "invoke_function_url",
     "publish_sns_message",
