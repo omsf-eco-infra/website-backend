@@ -102,6 +102,9 @@ data "aws_iam_policy_document" "orchestrator" {
     actions = [
       "s3:ListBucket",
     ]
+    # HeadObject on a missing key returns 404 only when the caller can list the
+    # bucket; without ListBucket, S3 returns 403 and the runtime cannot treat a
+    # brand-new graph as "no snapshot yet".
     resources = [aws_s3_bucket.state.arn]
   }
 

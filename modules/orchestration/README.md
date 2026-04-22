@@ -67,8 +67,10 @@ Derived resource names:
 - The orchestration queue uses `batch_size = 1` because the current Lambda
   handler only accepts one SQS record at a time.
 - The Lambda role includes `s3:ListBucket` on the state bucket in addition to
-  object reads and writes so its initial `HeadObject` checks can distinguish a
-  missing snapshot from an access error on a new graph.
+  object reads and writes because S3 `HeadObject` returns `404 Not Found` for a
+  missing snapshot only when the caller can list the bucket; without
+  `s3:ListBucket`, the same brand-new-graph lookup can fail as `403 Access
+  Denied`, which would break the "no snapshot yet" path.
 - The task SNS topic is FIFO with content-based deduplication. The runtime
   publishes `MessageGroupId = graph_id` so later FIFO task queues can subscribe
   without changing the message contract.
