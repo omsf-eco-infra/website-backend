@@ -46,15 +46,29 @@ Rules:
 
 ### Fargate-launcher Lambda
 
-- `WORKFLOW_NAME`
 - `ECS_CLUSTER_ARN`
 - `ECS_TASK_DEFINITION_ARN`
+- `ECS_CONTAINER_NAME`
 - `SUBNET_IDS`
 - `SECURITY_GROUP_IDS`
+- `ASSIGN_PUBLIC_IP` (optional, defaults to `DISABLED`)
 
-### Example worker containers
+### Worker containers
 
-Phase 0 does not define a shared worker-container environment contract. Example workers should receive only the variables needed for the specific test side effect they implement.
+Deployment-time variables live on the ECS task definition:
+
+- `WORKFLOW_NAME`
+- `TASK_QUEUE_URL`
+
+Per-task variables are injected by the launcher through ECS container overrides:
+
+- `GRAPH_ID`
+- `TASK_ID`
+- `TASK_TYPE`
+- `TASK_ATTEMPT`
+
+Workflow-specific payloads remain in the queue body; the launcher does not unpack
+`task_details` into environment variables.
 
 ## Python test command
 
