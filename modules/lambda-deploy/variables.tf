@@ -7,6 +7,11 @@ variable "repository_name" {
   }
 }
 
+variable "force_delete" {
+  type    = bool
+  default = false
+}
+
 variable "dockerfile_dir" {
   type = string
 

@@ -11,6 +11,8 @@ pulling the published image.
 Inputs:
 
 - `repository_name`: ECR repository name to create and publish into
+- `force_delete`: whether to delete the ECR repository even when it contains
+  images, default `false`
 - `dockerfile_dir`: directory that contains the Lambda `Dockerfile`
 - `build_context_dir`: Docker build context directory
 - `source_hash_paths`: explicit files and directories whose contents should
@@ -38,6 +40,8 @@ Notes:
 - `source_hash_paths` should include every local file tree that affects the
   Lambda image. For the current orchestration Lambda, that includes
   `pyproject.toml`, `src/website_backend`, and `modules/orchestration/lambda`.
+- Set `force_delete = true` only for disposable repositories, such as short-lived
+  test harnesses, where pushed images should not block teardown.
 
 Example:
 

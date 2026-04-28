@@ -43,6 +43,7 @@ module "this" {
   source = "../../../modules/lambda-deploy"
 
   repository_name   = local.repository_name
+  force_delete      = true
   dockerfile_dir    = "${local.repo_root}/modules/orchestration/lambda"
   build_context_dir = local.repo_root
   source_hash_paths = [

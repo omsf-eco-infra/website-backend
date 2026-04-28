@@ -79,5 +79,8 @@ class LocalOrchestrator(Orchestrator):
             )
         _logger.debug("Using %s as task status DB", taskdb_file)
         taskdb = TaskStatusDB.from_filename(taskdb_file)
-        yield taskdb
-        _logger.debug("Done with %s", taskdb_file)
+        try:
+            yield taskdb
+        finally:
+            _logger.debug("Done with %s", taskdb_file)
+            taskdb.engine.dispose()

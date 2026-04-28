@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import TypeVar
-
-MessageT = TypeVar("MessageT")
+from website_backend.queues.types import AWSMessageAttributes, MessageT
 
 
-def derive_message_attributes(message: MessageT) -> dict[str, dict[str, str]]:
+def derive_message_attributes(message: MessageT) -> AWSMessageAttributes:
     """Build default AWS string message attributes from common message fields.
 
     Parameters
@@ -15,11 +13,11 @@ def derive_message_attributes(message: MessageT) -> dict[str, dict[str, str]]:
 
     Returns
     -------
-    dict[str, dict[str, str]]
+    AWSMessageAttributes
         AWS-compatible message attributes derived from `version`,
         `message_type`, and `task_type` when those fields are present.
     """
-    attributes: dict[str, dict[str, str]] = {}
+    attributes: AWSMessageAttributes = {}
     for field_name in ("version", "message_type", "task_type"):
         value = getattr(message, field_name, None)
         if value is None:

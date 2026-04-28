@@ -93,3 +93,33 @@ def test_exercise_sqs_redrive_returns_false_when_source_never_receives() -> None
         "messages": [],
         "receive_count": 0,
     }
+
+
+def test_exercise_sqs_redrive_stops_when_deadline_passes_after_receive() -> None:
+    class OneMessageClient:
+        def receive_message(self, **kwargs: Any) -> dict[str, Any]:
+            return {
+                "Messages": [
+                    {
+                        "MessageId": "message-1",
+                        "Body": json.dumps({"task_id": "task-redrive"}),
+                    }
+                ]
+            }
+
+    timer_values = iter([0.0, 0.5, 1.0])
+
+    result = exercise_sqs_redrive.exercise_redrive(
+        queue_url="https://example.invalid/queue",
+        timeout_seconds=1,
+        poll_interval_seconds=1,
+        client=OneMessageClient(),
+        sleeper=lambda _: (_ for _ in ()).throw(AssertionError("unexpected sleep")),
+        timer=lambda: next(timer_values),
+    )
+
+    assert result["did_drain_from_source"] is False
+    assert result["empty_poll_count"] == 0
+    assert result["message_count"] == 1
+    assert result["messages"][0]["MessageId"] == "message-1"
+    assert result["receive_count"] == 1
