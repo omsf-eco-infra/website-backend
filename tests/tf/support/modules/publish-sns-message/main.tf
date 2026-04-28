@@ -32,6 +32,11 @@ variable "payload_file" {
   type = string
 }
 
+variable "payload_content_sha1" {
+  type    = string
+  default = null
+}
+
 variable "subject" {
   type    = string
   default = null
@@ -52,19 +57,46 @@ variable "message_attributes_file" {
   default = null
 }
 
+variable "message_attributes_content_sha1" {
+  type    = string
+  default = null
+}
+
 locals {
-  artifact_path = abspath("${var.artifacts_root}/${var.test_name}/${var.artifact_name}.json")
+  artifact_path                 = abspath("${var.artifacts_root}/${var.test_name}/${var.artifact_name}.json")
+  normalized_subject            = var.subject == null ? "" : var.subject
+  normalized_message_group_id   = var.message_group_id == null ? "" : var.message_group_id
+  normalized_message_dedup_id   = var.message_deduplication_id == null ? "" : var.message_deduplication_id
+  normalized_message_attrs_file = var.message_attributes_file == null ? "" : var.message_attributes_file
+  payload_sha1                  = var.payload_content_sha1 != null ? var.payload_content_sha1 : filesha1(var.payload_file)
+  message_attributes_file_sha1  = local.normalized_message_attrs_file == "" ? "" : (var.message_attributes_content_sha1 != null ? var.message_attributes_content_sha1 : filesha1(local.normalized_message_attrs_file))
 }
 
 resource "terraform_data" "publish" {
   triggers_replace = {
     topic_arn                = var.topic_arn
-    payload_sha1             = filesha1(var.payload_file)
-    subject                  = coalesce(var.subject, "")
-    message_group_id         = coalesce(var.message_group_id, "")
-    message_deduplication_id = coalesce(var.message_deduplication_id, "")
-    message_attributes_sha1  = var.message_attributes_file == null ? "" : filesha1(var.message_attributes_file)
+    payload_sha1             = local.payload_sha1
+    subject                  = local.normalized_subject
+    message_group_id         = local.normalized_message_group_id
+    message_deduplication_id = local.normalized_message_dedup_id
+    message_attributes_sha1  = local.message_attributes_file_sha1
     artifact_path            = local.artifact_path
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.payload_content_sha1 != null || fileexists(var.payload_file)
+      error_message = "payload_file must exist during planning unless payload_content_sha1 is provided."
+    }
+
+    precondition {
+      condition = (
+        local.normalized_message_attrs_file == "" ||
+        var.message_attributes_content_sha1 != null ||
+        fileexists(local.normalized_message_attrs_file)
+      )
+      error_message = "message_attributes_file must exist during planning unless message_attributes_content_sha1 is provided."
+    }
   }
 
   provisioner "local-exec" {
@@ -89,12 +121,12 @@ resource "terraform_data" "publish" {
     EOT
     environment = {
       ARTIFACT_PATH            = local.artifact_path
-      MESSAGE_ATTRIBUTES_FILE  = coalesce(var.message_attributes_file, "")
-      MESSAGE_DEDUPLICATION_ID = coalesce(var.message_deduplication_id, "")
-      MESSAGE_GROUP_ID         = coalesce(var.message_group_id, "")
+      MESSAGE_ATTRIBUTES_FILE  = local.normalized_message_attrs_file
+      MESSAGE_DEDUPLICATION_ID = local.normalized_message_dedup_id
+      MESSAGE_GROUP_ID         = local.normalized_message_group_id
       PAYLOAD_FILE             = var.payload_file
       PYTHON_EXECUTABLE        = var.python_executable
-      SUBJECT                  = coalesce(var.subject, "")
+      SUBJECT                  = local.normalized_subject
       TOPIC_ARN                = var.topic_arn
     }
   }

@@ -4,12 +4,12 @@ __all__ = [
     "FargateLauncherConfig",
     "build_run_task_request",
     "build_worker_environment_overrides",
-    "decode_sns_task_message",
+    "decode_sqs_task_message",
     "launch_task_for_message",
     "load_fargate_launcher_config",
     "process_task_available_event",
     "task_message_client_token",
-    "validate_sns_lambda_event",
+    "validate_sqs_lambda_event",
 ]
 
 import hashlib
@@ -72,40 +72,34 @@ def load_fargate_launcher_config(
     )
 
 
-def validate_sns_lambda_event(event: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Validate the expected one-record SNS Lambda event shape."""
+def validate_sqs_lambda_event(event: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate the expected one-record SQS Lambda event shape."""
     records = event.get("Records", [])
     if not isinstance(records, list) or len(records) != 1:
-        raise ValueError("Expected exactly one SNS record from the task topic trigger")
+        raise ValueError("Expected exactly one SQS record from the task topic trigger")
 
     record = records[0]
     if not isinstance(record, Mapping):
-        raise ValueError("Expected an SNS Lambda event record")
+        raise ValueError("Expected an SQS Lambda event record")
 
     event_source = record.get("EventSource") or record.get("eventSource")
-    if event_source not in {None, "aws:sns"}:
-        raise ValueError("Expected an SNS Lambda event record")
+    if event_source not in {None, "aws:sqs"}:
+        raise ValueError("Expected an SQS Lambda event record")
 
-    sns_record = record.get("Sns")
-    if not isinstance(sns_record, Mapping):
-        raise ValueError("SNS Lambda event record is missing Sns payload")
-
-    return sns_record
+    return record
 
 
-def decode_sns_task_message(event: Mapping[str, Any]) -> TaskMessage:
-    sns_record = validate_sns_lambda_event(event)
+def decode_sqs_task_message(event: Mapping[str, Any]) -> TaskMessage:
+    sqs_record = validate_sqs_lambda_event(event)
 
-    raw_message = sns_record.get("Message")
+    raw_message = sqs_record.get("body")
     if not isinstance(raw_message, str) or not raw_message:
-        raise ValueError("SNS Lambda event record is missing Sns.Message")
+        raise ValueError("SQS Lambda event record is missing body")
 
     try:
         parsed_message = json.loads(raw_message)
     except json.JSONDecodeError as exc:
-        raise ValueError(
-            "SNS Lambda event record contains invalid JSON message body"
-        ) from exc
+        raise ValueError("SQS Lambda event record contains invalid JSON body") from exc
 
     message = validate_task_message(parsed_message)
     validate_contract_version(message.version)
@@ -198,7 +192,7 @@ def process_task_available_event(
     ecs_client: Any | None = None,
     env: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    message = decode_sns_task_message(event)
+    message = decode_sqs_task_message(event)
     return launch_task_for_message(
         message,
         config=config,

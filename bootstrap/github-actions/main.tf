@@ -81,7 +81,13 @@ data "aws_iam_policy_document" "permissions" {
       "logs:*",
       "ecr:*",
       "ecs:*",
+      "ec2:AuthorizeSecurityGroupEgress",
+      "ec2:CreateSecurityGroup",
+      "ec2:CreateTags",
+      "ec2:DeleteSecurityGroup",
+      "ec2:DeleteTags",
       "ec2:Describe*",
+      "ec2:RevokeSecurityGroupEgress",
       "sts:GetCallerIdentity",
     ]
     resources = ["*"]

@@ -30,6 +30,7 @@ variable "content_json" {
 
 locals {
   artifact_path = abspath("${var.artifacts_root}/${var.test_name}/${var.artifact_name}.json")
+  content_sha1  = sha1(var.content_json)
 }
 
 resource "terraform_data" "write" {
@@ -76,6 +77,10 @@ data "external" "result" {
 
 output "artifact_path" {
   value = local.artifact_path
+}
+
+output "content_sha1" {
+  value = local.content_sha1
 }
 
 output "result" {

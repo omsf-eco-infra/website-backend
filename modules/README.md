@@ -2,6 +2,7 @@
 
 Reusable Terraform modules live in this directory.
 
+- `container-image`
 - `lambda-deploy`
 - `orchestration`
 - `task-queue`

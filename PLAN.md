@@ -76,10 +76,11 @@ The current queue adapters have already established the transport contract used 
 
 The Terraform module boundaries should stay aligned with the architecture document:
 
-- `lambda-deploy`: shared ECR-backed Lambda image publishing module that builds from source, hashes caller-selected source paths, and outputs a digest-pinned image URI for downstream Lambda modules
+- `container-image`: shared ECR-backed image publishing module that builds from source, hashes caller-selected source paths, and outputs a digest-pinned image URI
+- `lambda-deploy`: Lambda-specific image wrapper around `container-image` that adds Lambda platform validation and Lambda image-pull repository policy behavior
 - `orchestration`: orchestration queue, shared task topic, orchestrator Lambda, state-store inputs, outputs needed by downstream modules
 - `task-queue`: FIFO SQS task queue, DLQ, SNS subscription and filtering, outputs for compute modules
-- `fargate-compute`: launcher Lambda, ECS task definition, task-topic subscription, queue/network/image inputs
+- `fargate-compute`: launcher Lambda, ECS task definition, task-topic subscription, queue/network/image inputs; worker image publishing remains outside this module
 - `web-interface`: Lambda, Function URL, input and output buckets, orchestration queue access, outputs for website integration
 
 ## Assumptions and Defaults
@@ -266,14 +267,14 @@ This module deploys the reusable orchestration core. Its value is not just that 
 
 This is the first Terraform phase that must treat Lambda image wiring and deployed behavior as part of the module contract. The module should not stop at queues, topics, and IAM. It also needs to make the Phase 2 Lambda image deployable and testable.
 
-To keep later Lambda-bearing modules consistent, this phase also establishes a shared `lambda-deploy` Terraform module at `modules/lambda-deploy/`. That module is responsible for building a Lambda container image from local code, pushing it to ECR, and exposing a digest-pinned image URI. Later phases should reuse it for the launcher Lambda and web-interface Lambda instead of reimplementing image build/publish logic.
+To keep later image-bearing modules consistent, this phase also establishes shared image publication modules. `modules/container-image/` owns generic ECR image build, push, source hashing, and digest resolution. `modules/lambda-deploy/` wraps that generic module with Lambda-specific platform validation and repository policy behavior. Later Lambda-bearing phases should reuse `lambda-deploy`, while Fargate worker tests and other non-Lambda containers should use `container-image` directly.
 
 ### Checklist
 
-- [x] Create the shared `lambda-deploy` Terraform module structure.
+- [x] Create the shared `container-image` and `lambda-deploy` Terraform module structures.
 - [x] Define `lambda-deploy` inputs for repository name, Lambda Dockerfile directory, build context directory, explicit source-hash paths, platform/architecture, and tagging.
-- [x] Make `lambda-deploy` create an ECR repository, build and push the Lambda image from local code, and output a digest-pinned image URI.
-- [x] Make `lambda-deploy` hash the caller-selected source paths so OpenTofu rebuilds the image when the Lambda source or shared runtime code changes.
+- [x] Make `container-image` create an ECR repository, build and push the image from local code, and output a digest-pinned image URI.
+- [x] Make `container-image` hash the caller-selected source paths so OpenTofu rebuilds the image when the image source or shared runtime code changes.
 - [x] Add native `terraform test` coverage for `lambda-deploy` using the example orchestrator Lambda Dockerfile layout in `modules/orchestration/lambda/`.
 - [x] Create the `orchestration` Terraform module structure.
 - [x] Define inputs for the orchestration queue, shared task topic behavior, state-store bucket/key configuration, and tagging.
@@ -286,7 +287,7 @@ To keep later Lambda-bearing modules consistent, this phase also establishes a s
 
 ### Definition of Done
 
-- The shared `lambda-deploy` module can build and publish a Lambda image from local source and is reusable by later Lambda-bearing Terraform phases.
+- The shared `container-image` module can build and publish an image from local source, and `lambda-deploy` remains reusable by later Lambda-bearing Terraform phases.
 - The module can be instantiated on its own in the sandbox account.
 - A real orchestration message sent to the deployed resources produces observable orchestration side effects.
 - The module outputs are sufficient for downstream modules without leaking implementation details.
@@ -386,14 +387,14 @@ This phase must also prove that the deployed compute path actually works in AWS.
 
 ### Checklist
 
-- [ ] Create the `fargate-compute` Terraform module structure.
-- [ ] Provision launcher subscription wiring, ECS task definition, IAM, logging, and required networking inputs.
-- [ ] Accept a container image URI as an input instead of building container images inside the module.
-- [ ] Reuse `lambda-deploy` for the Phase 5 launcher Lambda image while continuing to accept a separate ECS worker image URI as an input.
-- [ ] Wire the module to the `task-queue` outputs and shared task topic conventions.
-- [ ] Add a lightweight generic example worker image for integration tests.
-- [ ] Define the observable side effect used by tests to prove worker execution.
-- [ ] Add native `terraform test` coverage that publishes a task and verifies that an ECS task is launched and the example worker completes the expected side effect.
+- [x] Create the `fargate-compute` Terraform module structure.
+- [x] Provision launcher subscription wiring, ECS task definition, IAM, logging, and required networking inputs.
+- [x] Accept a container image URI as an input instead of building container images inside the module.
+- [x] Reuse `lambda-deploy` for the Phase 5 launcher Lambda image while continuing to accept a separate ECS worker image URI as an input.
+- [x] Wire the module to the `task-queue` outputs and shared task topic conventions.
+- [x] Add a lightweight generic example worker image for integration tests.
+- [x] Define the observable side effect used by tests to prove worker execution.
+- [x] Add native `terraform test` coverage that publishes a task and verifies that an ECS task is launched and the example worker completes the expected side effect.
 
 ### Definition of Done
 
